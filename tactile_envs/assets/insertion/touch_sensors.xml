@@ -16,5 +16,51 @@
         <config key="nchannel" value="3"/>
         </plugin>
     </sensor>
-    </mujoco>
+    </mujoco> 
     
+    <!-- <mujoco>
+    <asset>
+        <!-- 导入右侧模型的 STL 文件 -->
+        <mesh name="custom_mesh_right" file="/Users/xiaokangsun/local_py_proj/tactile_env/tactile_envs/assets/insertion/assets/softbody.stl"/>
+        <!-- 导入左侧模型的 STL 文件 -->
+        <mesh name="custom_mesh_left" file="/Users/xiaokangsun/local_py_proj/tactile_env/tactile_envs/assets/insertion/assets/softbody.stl"/>
+    </asset>
+
+    <worldbody>
+        <!-- 定义右侧模型 -->
+        <body name="custom_body_right">
+            <!-- 右侧几何体关联导入的 STL 模型 -->
+            <geom name="custom_geom_right" type="mesh" mesh="custom_mesh_right" pos="0 0 0"/>
+            <!-- 右侧传感器站点与几何体关联 -->
+            <site name="touch_right" pos="0 0 0" size="0.01" geom="custom_geom_right"/>
+        </body>
+
+        <!-- 定义左侧模型 -->
+        <body name="custom_body_left">
+            <!-- 左侧几何体关联导入的 STL 模型 -->
+            <geom name="custom_geom_left" type="mesh" mesh="custom_mesh_left" pos="0 0 0"/>
+            <!-- 左侧传感器站点与几何体关联 -->
+            <site name="touch_left" pos="0 0 0" size="0.01" geom="custom_geom_left"/>
+        </body>
+    </worldbody>
+
+    <sensor>
+        <!-- 右侧触觉传感器插件 -->
+        <plugin name="touch_right" plugin="mujoco.sensor.touch_grid" objtype="site" objname="touch_right">
+            <config key="size" value="32 32"/>
+            <config key="fov" value="14 23"/>
+            <config key="gamma" value="0"/>
+            <config key="nchannel" value="3"/>
+        </plugin>
+    </sensor>
+
+    <sensor>
+        <!-- 左侧触觉传感器插件 -->
+        <plugin name="touch_left" plugin="mujoco.sensor.touch_grid" objtype="site" objname="touch_left">
+            <config key="size" value="32 32"/>
+            <config key="fov" value="14 23"/>
+            <config key="gamma" value="0"/>
+            <config key="nchannel" value="3"/>
+        </plugin>
+    </sensor>
+</mujoco> -->

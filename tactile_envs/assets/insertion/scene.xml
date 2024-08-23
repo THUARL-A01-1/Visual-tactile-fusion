@@ -140,7 +140,8 @@
             <geom class="visual" mesh="follower" material="black"/>
             <geom class="collision" mesh="follower"/>
             <body name="right_pad" pos="0 -0.0189 0.01352" gravcomp="1">
-              <include file="right_pad_collisions.xml"/>
+              <!-- <include file="right_pad_collisions.xml"/> -->
+              <include file="left_custom_pad_collisions.xml"/>
               <inertial mass="0.0035" pos="0 -0.0025 0.0185" quat="0.707107 0 0 0.707107"
               diaginertia="4.73958e-07 3.64583e-07 1.23958e-07"/>
               <geom class="visual" mesh="pad"/>
@@ -180,7 +181,8 @@
             <geom class="visual" mesh="follower" material="black"/>
             <geom class="collision" mesh="follower"/>
             <body name="left_pad" pos="0 -0.0189 0.01352" gravcomp="1">
-              <include file="left_pad_collisions.xml"/>
+              <!-- <include file="left_pad_collisions.xml"/> -->
+              <include file="right_custom_pad_collisions.xml"/>
               <inertial mass="0.0035" pos="0 -0.0025 0.0185" quat="1 0 0 1"
               diaginertia="4.73958e-07 3.64583e-07 1.23958e-07"/>
               <geom class="visual" mesh="pad"/>
@@ -251,7 +253,8 @@
       gainprm="0.31372549 0 0" biasprm="0 -100 -10"/>
   </actuator>
 
-  <include file="touch_sensors.xml"/>
+  <!-- <include file="touch_sensors.xml"/> -->
+  <include file="custom_touch_sensors.xml"/>
 
   <statistic center="0 0 0.05" extent="0.3"/>
 

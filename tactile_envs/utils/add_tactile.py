@@ -14,7 +14,7 @@ class AddTactile(gym.ObservationWrapper):
    
         gym.ObservationWrapper.__init__(self, env)
 
-        self.obs_shape = (3, 32, 32)
+        self.obs_shape = (3, 20, 20)
 
         self.observation_space['tactile'] = Box(
             low=-np.inf,

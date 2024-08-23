@@ -26,7 +26,7 @@ class InsertionEnv(gym.Env):
 
     def __init__(self, no_rotation=True, 
         no_gripping=True, state_type='vision_and_touch', camera_idx=0, symlog_tactile=True, 
-        env_id = -1, im_size=64, tactile_shape=(32,32), skip_frame=10, max_delta=None, multiccd=False,
+        env_id = -1, im_size=64, tactile_shape=(20,20), skip_frame=10, max_delta=None, multiccd=False,
         objects = ["square", "triangle", "horizontal", "vertical", "trapezoidal", "rhombus"],
         holders = ["holder1", "holder2", "holder3"]):
 
@@ -71,6 +71,9 @@ class InsertionEnv(gym.Env):
 
         self.tactile_rows = tactile_shape[0]
         self.tactile_cols = tactile_shape[1]
+        print("tactile_shape: ", tactile_shape) ###
+        print("tactile_rows: ", self.tactile_rows) ###
+        print("tactile_cols: ", self.tactile_cols)
         self.tactile_comps = 3
 
         self.im_size = im_size
@@ -119,7 +122,8 @@ class InsertionEnv(gym.Env):
         print("ndof_u: ", self.ndof_u)
         
         self.action_space = spaces.Box(low = np.full(self.ndof_u, -1.), high = np.full(self.ndof_u, 1.), dtype = np.float32)
-        self.action_scale = np.array([[-0.2,0.2],[-0.2,0.2],[-0.12,0.3],[-np.pi,np.pi],[0,255]])
+        # self.action_scale = np.array([[-0.2,0.2],[-0.2,0.2],[-0.12,0.3],[-np.pi,np.pi],[0,255]])
+        self.action_scale = np.array([[-2,2],[-2,2],[-2,2],[-np.pi,np.pi],[0,255]])
 
         self.action_mask = np.ones(5, dtype=bool)
         if no_rotation:
@@ -170,6 +174,10 @@ class InsertionEnv(gym.Env):
             
             new_pos = [str(offset_x + correction_rot[0]), str(offset_y + correction_rot[1]), str(float(pos[2]))]
             new_pos_str = " ".join(new_pos)
+
+            if attribute == 'object':
+                print(f"New object position: x={new_pos[0]}, y={new_pos[1]}, z={new_pos[2]}")
+
             
             self.xml_content = self.xml_content[:pos_start_idx] + new_pos_str + self.xml_content[pos_end_idx:]
 
@@ -219,16 +227,21 @@ class InsertionEnv(gym.Env):
                 
             return True
             
-        offset_x = 0.05*np.random.rand()
-        offset_y = 0.05*np.random.rand()
+        # offset_x = 0.05*np.random.rand()
+        # offset_y = 0.05*np.random.rand()
+        offset_x = 0
+        offset_y = 0
 
         if self.with_rotation:
-            offset_yaw = 2*np.pi*np.random.rand()-np.pi
+            # offset_yaw = 2*np.pi*np.random.rand()-np.pi
+            offset_yaw = 0
         else:
             offset_yaw = 0.
 
-        holder = np.random.choice(holders)
-        object = np.random.choice(objects)
+        # holder = np.random.choice(holders)
+        # object = np.random.choice(objects)
+        holder = holders[0]
+        object = objects[0]
 
         edit_attribute("object", offset_x, offset_y, offset_yaw, holder, object)
         edit_attribute("walls", offset_x, offset_y, offset_yaw, holder, object)

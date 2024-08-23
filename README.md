@@ -4,6 +4,8 @@ Collection of MuJoCo robotics environments equipped with both vision and tactile
 
 ![](teaser.png)
 
+![](teaser.png)
+
 Current available environments:
 * `tactile_envs/Insertion-v0` (see [Insertion](scripts/test_env_insertion.py))
 * `Door` (see [Door](scripts/test_env_door.py))

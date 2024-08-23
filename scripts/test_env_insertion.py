@@ -35,13 +35,14 @@ if __name__ == "__main__":
 
     show_highres = False # Set to True to show highres images (slow!)
     
-    n_episodes = 10
+    n_episodes = 100
     n_steps = 300
     
-    env = gym.make("tactile_envs/Insertion-v0", state_type='vision_and_touch', multiccd=False, im_size=64, no_gripping=True, no_rotation=True, tactile_shape=(32,32), max_delta=None)
+    env = gym.make("tactile_envs/Insertion-v0", state_type='vision_and_touch', multiccd=False, im_size=256, no_gripping=True, no_rotation=True, tactile_shape=(20,20), max_delta=None)
     
     for j in range(n_episodes):
         seed = np.random.randint(0,1000)
+        # seed = 40
         print("seed: ", seed)
         env.reset(**{'seed': seed})
         tic = time.time()
@@ -49,6 +50,8 @@ if __name__ == "__main__":
         for i in range(n_steps):
             # Take a random action
             action = env.action_space.sample()
+            # action = [0,0,0]
+            print("action: ", action)
             
             obs, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated

@@ -7,6 +7,7 @@ import time
 import cv2 
 
 def show_tactile(tactile, size=(480,480), max_shear=0.05, max_pressure=0.1, name='tactile'): # Note: default params work well for 16x16 or 32x32 tactile sensors, adjust for other sizes
+    ''' Visualize tactile sensor data'''
     nx = tactile.shape[2]
     ny = tactile.shape[1]
 
@@ -38,19 +39,17 @@ if __name__ == "__main__":
     n_episodes = 100
     n_steps = 300
     
-    env = gym.make("tactile_envs/Insertion-v0", state_type='vision_and_touch', multiccd=False, im_size=256, no_gripping=True, no_rotation=True, tactile_shape=(20,20), max_delta=None)
+    env = gym.make("tactile_envs/Insertion-v0", state_type='vision_and_touch', multiccd=False, im_size=480, no_gripping=False, no_rotation=True, tactile_shape=(20,20), max_delta=None)
     
     for j in range(n_episodes):
         seed = np.random.randint(0,1000)
-        # seed = 40
-        print("seed: ", seed)
         env.reset(**{'seed': seed})
         tic = time.time()
 
         for i in range(n_steps):
-            # Take a random action
+            # Keep the gripper closed
             action = env.action_space.sample()
-            # action = [0,0,0]
+            # action = [0.0, 0, 0, 0]
             print("action: ", action)
             
             obs, reward, terminated, truncated, info = env.step(action)
@@ -70,7 +69,43 @@ if __name__ == "__main__":
                 print("Done")
                 break
 
-        print("Number of steps: ", i)
-        print("frequency: ", i/(time.time()-tic))
+
+
+    exit()
+
+    # # 原始代码
+    # for j in range(n_episodes):
+    #     seed = np.random.randint(0,1000)
+    #     # seed = 40
+    #     print("seed: ", seed)
+    #     # env.reset(**{'seed': seed})
+    #     env.reset()
+    #     tic = time.time()
+
+    #     for i in range(n_steps):
+    #         # Take a random action
+    #         action = env.action_space.sample()
+    #         # action = [0,0,0]
+    #         print("action: ", action)
+            
+    #         obs, reward, terminated, truncated, info = env.step(action)
+    #         done = terminated or truncated
+
+    #         img_tactile1 = show_tactile(obs['tactile'][:3], name='tactile1')
+    #         img_tactile2 = show_tactile(obs['tactile'][3:], name='tactile2')
+
+    #         if show_highres:
+    #             img = env.unwrapped.render(highres=True)
+    #             cv2.imshow('img', img[:,:,::-1])
+    #         else:
+    #             cv2.imshow('img', obs['image'][:,:,::-1])
+    #         cv2.waitKey(1)
+            
+    #         if done == True:
+    #             print("Done")
+    #             break
+
+    #     print("Number of steps: ", i)
+    #     print("frequency: ", i/(time.time()-tic))
         
         

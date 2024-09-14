@@ -21,7 +21,8 @@
     <mesh class="2f85" file="driver.stl"/>
     <mesh class="2f85" file="coupler.stl"/>
     <mesh class="2f85" file="follower.stl"/>
-    <mesh class="2f85" file="pad.stl"/>
+    <!-- <mesh class="2f85" file="pad.stl"/>  -->
+    <mesh class="2f85" file="pad.stl"/> 
     <mesh class="2f85" file="silicone_pad.stl"/>
     <mesh class="2f85" file="spring_link.stl"/>
 
@@ -139,7 +140,8 @@
             <joint name="right_follower_joint" class="follower"/>
             <geom class="visual" mesh="follower" material="black"/>
             <geom class="collision" mesh="follower"/>
-            <body name="right_pad" pos="0 -0.0189 0.01352" gravcomp="1">
+            <!-- <body name="right_pad" pos="0 -0.0189 0.01352" gravcomp="1"> -->
+            <body name="right_pad" pos="0 -0.0189 0.04" gravcomp="1">
               <!-- <include file="right_pad_collisions.xml"/> -->
               <include file="left_custom_pad_collisions.xml"/>
               <inertial mass="0.0035" pos="0 -0.0025 0.0185" quat="0.707107 0 0 0.707107"
@@ -169,6 +171,7 @@
           </body>
         </body>
         <body name="left_spring_link" pos="0 -0.0132 0.0609" quat="0 0 0 1" gravcomp="1">
+        <!-- <body name="left_spring_link" pos="0 -0.0132 0" quat="0 0 0 1" gravcomp="1"> -->
           <inertial mass="0.0221642" pos="-8.65005e-09 0.0181624 0.0212658" quat="0.663403 -0.244737 0.244737 0.663403"
             diaginertia="8.96853e-06 6.71733e-06 2.63931e-06"/>
           <joint name="left_spring_link_joint" class="spring_link"/>
@@ -180,16 +183,19 @@
             <joint name="left_follower_joint" class="follower"/>
             <geom class="visual" mesh="follower" material="black"/>
             <geom class="collision" mesh="follower"/>
-            <body name="left_pad" pos="0 -0.0189 0.01352" gravcomp="1">
+            <!-- <body name="left_pad" pos="0 -0.0189 0.01352" gravcomp="1"> -->
+            <body name="left_pad" pos="0 -0.0189 0.04" gravcomp="1">
               <!-- <include file="left_pad_collisions.xml"/> -->
               <include file="right_custom_pad_collisions.xml"/>
               <inertial mass="0.0035" pos="0 -0.0025 0.0185" quat="1 0 0 1"
               diaginertia="4.73958e-07 3.64583e-07 1.23958e-07"/>
               <geom class="visual" mesh="pad"/>
               <body name="left_silicone_pad" gravcomp="1">
-              <geom class="visual" mesh="silicone_pad" material="black"/>
-              <site name="touch_left" pos="0 0.04 0.018" zaxis="0 1 0" rgba="0 0 1 0"/>
-              <site name="finger_left" pos="0 -0.007 0.018" zaxis="1 0 0" rgba="1 0 0 1" group="5"/>
+              <geom class="visual" mesh="silicone_pad" material="gray"/>
+              <!-- <site name="touch_left" pos="0 0.04 0.018" zaxis="0 1 0" rgba="0 0 1 0"/>
+              <site name="finger_left" pos="0 -0.007 0.018" zaxis="1 0 0" rgba="1 0 0 1" group="5"/> -->
+              <site name="touch_left" pos="0 0 0" zaxis="0 1 0" rgba="0 0 1 0"/> 
+              <site name="finger_left" pos="0 0 0" zaxis="1 0 0" rgba="1 0 0 1" group="5"/>
               </body>
           </body>
           </body>

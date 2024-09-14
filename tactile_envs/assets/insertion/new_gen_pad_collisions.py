@@ -5,7 +5,7 @@ from absl import app
 
 def main(_):
     # 从CSV文件读取XYZ坐标
-    coordinates = pd.read_csv("tactile_envs/assets/insertion/marker_coordinate.csv", header=None)  # 请替换为你的CSV文件路径
+    coordinates = pd.read_csv("tactile_envs/assets/insertion/marker_coordinate.csv", header=None)  
     # print(len(coordinates))
     # exit(0)
     num_rows = 20

@@ -12,6 +12,7 @@ import cv2
 from pathlib import Path
 
 def convert_observation_to_space(observation):
+    ''' Convert an observation dictionary to a gym space '''
     
     space = spaces.Dict(spaces={})
     for key in observation.keys():
@@ -26,7 +27,7 @@ class InsertionEnv(gym.Env):
 
     def __init__(self, no_rotation=True, 
         no_gripping=True, state_type='vision_and_touch', camera_idx=0, symlog_tactile=True, 
-        env_id = -1, im_size=64, tactile_shape=(20,20), skip_frame=10, max_delta=None, multiccd=False,
+        env_id = -1, im_size=128, tactile_shape=(20,20), skip_frame=10, max_delta=None, multiccd=False,
         objects = ["square", "triangle", "horizontal", "vertical", "trapezoidal", "rhombus"],
         holders = ["holder1", "holder2", "holder3"]):
 
@@ -61,9 +62,9 @@ class InsertionEnv(gym.Env):
             self.update_include_path()
             self.xml_content_reference = self.xml_content
 
-        self.multiccd = multiccd
+        self.multiccd = multiccd # if True, the multiccd flag will be enabled
 
-        self.fixed_gripping = 200
+        self.fixed_gripping = 200 # 200 # fixed gripper value
 
         self.max_delta = max_delta
 
@@ -121,7 +122,7 @@ class InsertionEnv(gym.Env):
 
         print("ndof_u: ", self.ndof_u)
         
-        self.action_space = spaces.Box(low = np.full(self.ndof_u, -1.), high = np.full(self.ndof_u, 1.), dtype = np.float32)
+        self.action_space = spaces.Box(low = np.full(self.ndof_u, -1.), high = np.full(self.ndof_u, 1.), dtype = np.float32) # x, y, z, yaw, gripper
         # self.action_scale = np.array([[-0.2,0.2],[-0.2,0.2],[-0.12,0.3],[-np.pi,np.pi],[0,255]])
         self.action_scale = np.array([[-2,2],[-2,2],[-2,2],[-np.pi,np.pi],[0,255]])
 
@@ -147,8 +148,8 @@ class InsertionEnv(gym.Env):
         file_start_idx = file_idx + len('meshdir="')
         self.xml_content = self.xml_content[:file_start_idx] + self.current_dir + '/' + self.xml_content[file_start_idx:]
 
-
     def edit_xml(self):
+        ''' Edit the XML file to change the object and holder '''
         
         holders = self.holders
         objects = self.objects
@@ -240,8 +241,8 @@ class InsertionEnv(gym.Env):
 
         # holder = np.random.choice(holders)
         # object = np.random.choice(objects)
-        holder = holders[0]
-        object = objects[0]
+        holder = holders[1]
+        object = objects[3]
 
         edit_attribute("object", offset_x, offset_y, offset_yaw, holder, object)
         edit_attribute("walls", offset_x, offset_y, offset_yaw, holder, object)
@@ -253,8 +254,12 @@ class InsertionEnv(gym.Env):
 
     def generate_initial_pose(self, show_full=False):
         
-        cruise_height = 0.
-        gripping_height = -0.11
+        # 原始参数
+        # cruise_height = 0. 
+        # gripping_height = -0.11
+
+        cruise_height = -0.05
+        gripping_height = 0
         
         mujoco.mj_resetData(self.sim, self.mj_data)
 
@@ -265,6 +270,12 @@ class InsertionEnv(gym.Env):
         else:
             rand_yaw = 0
 
+
+        #
+        rand_x = 0
+        rand_y = 0
+        rand_yaw = 0
+
         steps_per_phase = 60
 
         for i in range(steps_per_phase): # go on top of object
@@ -274,7 +285,7 @@ class InsertionEnv(gym.Env):
                 self.renderer.update_scene(self.mj_data, camera=0)
                 img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
                 cv2.imshow('img', img)
-                cv2.waitKey(1)
+                cv2.waitKey(10)
 
         for i in range(steps_per_phase): # rotate wrist
             self.mj_data.ctrl[3] = -np.arcsin(self.target_quat[-1])*2
@@ -283,7 +294,7 @@ class InsertionEnv(gym.Env):
                 self.renderer.update_scene(self.mj_data, camera=0)
                 img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
                 cv2.imshow('img', img)
-                cv2.waitKey(1)
+                cv2.waitKey(10)
             
         for i in range(steps_per_phase): # move around object
             self.mj_data.ctrl[:3] = [self.offset_x, self.offset_y, gripping_height]
@@ -292,7 +303,7 @@ class InsertionEnv(gym.Env):
                 self.renderer.update_scene(self.mj_data, camera=0)
                 img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
                 cv2.imshow('img', img)
-                cv2.waitKey(1)
+                cv2.waitKey(10)
             
         for i in range(steps_per_phase): # close gripper
             self.mj_data.ctrl[-1] = self.fixed_gripping
@@ -301,7 +312,7 @@ class InsertionEnv(gym.Env):
                 self.renderer.update_scene(self.mj_data, camera=0)
                 img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
                 cv2.imshow('img', img)
-                cv2.waitKey(1)
+                cv2.waitKey(10)
             
         for i in range(steps_per_phase): # lift object
             self.mj_data.ctrl[:3] = [self.offset_x, self.offset_y, cruise_height]
@@ -310,7 +321,7 @@ class InsertionEnv(gym.Env):
                 self.renderer.update_scene(self.mj_data, camera=0)
                 img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
                 cv2.imshow('img', img)
-                cv2.waitKey(1)
+                cv2.waitKey(10)
 
         
         for i in range(steps_per_phase): # rotate in place
@@ -320,7 +331,7 @@ class InsertionEnv(gym.Env):
                 self.renderer.update_scene(self.mj_data, camera=0)
                 img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
                 cv2.imshow('img', img)
-                cv2.waitKey(1)
+                cv2.waitKey(10)
             
         for i in range(steps_per_phase): # move to random position
             self.mj_data.ctrl[:3] = [rand_x, rand_y, cruise_height]
@@ -329,7 +340,7 @@ class InsertionEnv(gym.Env):
                 self.renderer.update_scene(self.mj_data, camera=0)
                 img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
                 cv2.imshow('img', img)
-                cv2.waitKey(1)
+                cv2.waitKey(10)
 
         self.prev_action_xyz = np.array([rand_x, rand_y, cruise_height])
 
@@ -403,7 +414,7 @@ class InsertionEnv(gym.Env):
         
         if highres:
             del self.renderer
-            self.renderer = mujoco.Renderer(self.sim, height=480, width=480)
+            self.renderer = mujoco.Renderer(self.sim, height=1000, width=1000)
             self.renderer.update_scene(self.mj_data, camera=self.camera_idx)
             img = self.renderer.render()/255
             del self.renderer
@@ -419,8 +430,8 @@ class InsertionEnv(gym.Env):
         action = u
         action = np.clip(u, -1., 1.)
         
-        action_unnorm = (action + 1)/2 * (self.action_scale[:,1]-self.action_scale[:,0]) + self.action_scale[:,0]
-
+        action_unnorm = (action + 1)/2 * (self.action_scale[:,1]-self.action_scale[:,0]) + self.action_scale[:,0] # unnormalize action
+ 
         if self.max_delta is not None:
             action_unnorm = np.clip(action_unnorm[:3], self.prev_action_xyz - self.max_delta, self.prev_action_xyz + self.max_delta)
         

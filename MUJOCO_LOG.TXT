@@ -4,3 +4,6 @@ WARNING: Insufficient arena memory for the number of constraints generated. Incr
 Thu Aug 22 17:46:06 2024
 WARNING: Nan, Inf or huge value in QACC at DOF 12. The simulation is unstable. Time = 0.0380.
 
+Sat Sep 14 08:25:40 2024
+WARNING: mju_openResource: unknown file '/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/tactile_envs/envs/Gymnasium-Robotics/gymnasium_robotics/envs/assets/hand/custom_touch_sensors.xml'
+

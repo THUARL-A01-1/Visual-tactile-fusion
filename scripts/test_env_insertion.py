@@ -50,6 +50,7 @@ if __name__ == "__main__":
             # Keep the gripper closed
             action = env.action_space.sample()
             # action = [0.0, 0, 0, 0]
+            action[2] = 0.0
             print("action: ", action)
             
             obs, reward, terminated, truncated, info = env.step(action)

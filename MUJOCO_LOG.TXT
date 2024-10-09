@@ -7,3 +7,12 @@ WARNING: Nan, Inf or huge value in QACC at DOF 12. The simulation is unstable. T
 Sat Sep 14 08:25:40 2024
 WARNING: mju_openResource: unknown file '/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/tactile_envs/envs/Gymnasium-Robotics/gymnasium_robotics/envs/assets/hand/custom_touch_sensors.xml'
 
+Sat Sep 28 00:13:36 2024
+WARNING: Insufficient arena memory for the number of constraints generated. Increase arena memory allocation above 100M bytes. Time = 0.0000.
+
+Sat Sep 28 00:14:36 2024
+WARNING: Too many contacts. Either the arena memory is full, or nconmax is specified and is exceeded. Increase arena memory allocation, or increase/remove nconmax. (ncon = 181973) Time = 0.0000.
+
+Sat Sep 28 00:14:36 2024
+WARNING: Insufficient arena memory for the number of constraints generated. Increase arena memory allocation above 100M bytes. Time = 0.0000.
+

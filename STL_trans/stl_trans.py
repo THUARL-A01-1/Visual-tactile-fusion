@@ -1,6 +1,8 @@
 import numpy as np
 from stl import mesh
 
+''' stl 文件坐标轴转换 '''
+
 your_mesh = mesh.Mesh.from_file('STL_trans/old_pad.stl')
 
 # 读取 STL 文件

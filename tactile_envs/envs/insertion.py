@@ -1,15 +1,16 @@
+'''
+Defines the insertion environment for the tactile sensing task.
+'''
 import os
 import cv2 
-
 import gymnasium as gym
-
 import mujoco
-
 import numpy as np
 from gymnasium import spaces
 import cv2
 
 from pathlib import Path
+
 
 def convert_observation_to_space(observation):
     ''' Convert an observation dictionary to a gym space '''
@@ -65,7 +66,7 @@ class InsertionEnv(gym.Env):
         self.multiccd = multiccd # if True, the multiccd flag will be enabled
 
         '''可以调整的参数'''
-        self.fixed_gripping = 300 # 200 # fixed gripper value #数值越大，夹持力越大
+        self.fixed_gripping = 200 # 200 # fixed gripper value #数值越大，夹持力越大
 
         self.max_delta = max_delta
 
@@ -73,9 +74,9 @@ class InsertionEnv(gym.Env):
 
         self.tactile_rows = tactile_shape[0]
         self.tactile_cols = tactile_shape[1]
-        print(">>>>>>>>>>tactile_shape: ", tactile_shape) ###
-        print(">>>>>>>>>>tactile_rows: ", self.tactile_rows) ###
-        print(">>>>>>>>>>tactile_cols: ", self.tactile_cols)
+        # print(">>>>>>>>>>tactile_shape: ", tactile_shape) ###
+        # print(">>>>>>>>>>tactile_rows: ", self.tactile_rows) ###
+        # print(">>>>>>>>>>tactile_cols: ", self.tactile_cols)
         self.tactile_comps = 3 # tactile components (x, y, z)
 
         self.im_size = im_size
@@ -232,13 +233,15 @@ class InsertionEnv(gym.Env):
                 
             return True
             
-        offset_x = 0.05*np.random.rand()
-        offset_y = 0.05*np.random.rand()
+        # random position and orientation
+        # offset_x = 0.05*np.random.rand()
+        # offset_y = 0.05*np.random.rand()
         # 0 offset, fixed position
-        # offset_x = 0 
-        # offset_y = 0
+        offset_x = 0 
+        offset_y = 0
 
         if self.with_rotation:
+            # 可以设置随机的物体角度
             # offset_yaw = 2*np.pi*np.random.rand()-np.pi
             offset_yaw = 0
         else:
@@ -257,14 +260,71 @@ class InsertionEnv(gym.Env):
         self.offset_yaw = offset_yaw
         self.target_quat = np.array([np.cos(offset_yaw/2), 0, 0, np.sin(offset_yaw/2)])
 
+    # new code
+    def update_tactile_feedback(self, show_full=False):
+        ''' 实时更新触觉反馈并显示图像，专门负责获取并处理触觉传感器的数据，并且根据设置来决定是否显示图像（如 show_full 为真） '''
+        if self.state_type == 'vision_and_touch' or self.state_type == 'touch':
+            tactiles_right = self.mj_data.sensor('touch_right').data.reshape((3, self.tactile_rows, self.tactile_cols))
+            tactiles_right = tactiles_right[[1, 2, 0]]
+            tactiles_left = self.mj_data.sensor('touch_left').data.reshape((3, self.tactile_rows, self.tactile_cols))
+            tactiles_left = tactiles_left[[1, 2, 0]]
+            tactiles = np.concatenate((tactiles_right, tactiles_left), axis=0)
+            
+            if self.symlog_tactile:
+                tactiles = np.sign(tactiles) * np.log(1 + np.abs(tactiles))
+            
+            if self.state_type == 'vision_and_touch':
+                img = self.render()
+                self.curr_obs = {'image': img, 'tactile': tactiles}
+            else:
+                self.curr_obs = {'tactile': tactiles}
+
+        if show_full:
+            self.renderer.update_scene(self.mj_data, camera=0)
+            img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
+            cv2.imshow('simulation img', img)
+            cv2.waitKey(1)
+
+        # print("************* tesing for real time tactiles: ", tactiles)
+        img_tactile1 = self.show_tactile(self.curr_obs['tactile'][:3], name='tactile1')
+        img_tactile2 = self.show_tactile(self.curr_obs['tactile'][3:], name='tactile2')
+
+    # new code
+    def show_tactile(self, tactile, size=(480,480), max_shear=0.05, max_pressure=0.1, name='tactile'): # Note: default params work well for 16x16 or 32x32 tactile sensors, adjust for other sizes
+        ''' Visualize tactile sensor data'''
+        nx = tactile.shape[2]
+        ny = tactile.shape[1]
+
+        loc_x = np.linspace(0,size[1],nx)
+        loc_y = np.linspace(size[0],0,ny)
+
+        img = np.zeros((size[0],size[1],3))
+
+        for i in range(0,len(loc_x),1):
+            for j in range(0,len(loc_y),1):
+                
+                dir_x = np.clip(tactile[0,j,i]/max_shear,-1,1) * 20
+                dir_y = np.clip(tactile[1,j,i]/max_shear,-1,1) * 20
+
+                color = np.clip(tactile[2,j,i]/max_pressure,0,1)
+                r = color
+                g = 1-color
+
+                cv2.arrowedLine(img, (int(loc_x[i]),int(loc_y[j])), (int(loc_x[i]+dir_x),int(loc_y[j]-dir_y)), (0,g,r), 4, tipLength=0.5)
+
+        cv2.imshow(name, img)
+
+        return img
+
     def generate_initial_pose(self, show_full=True):
+        ''' Generate the initial pose & movements of the robot '''
         
-        # 原始参数
-        cruise_height = 0. 
+        # # 原始参数
+        cruise_height = -0.03
         gripping_height = -0.075 #-0.11
 
         # 自定义参数
-        # cruise_height = -0.05 # 巡航高度
+        # cruise_height = -0.005 # 巡航高度
         # gripping_height = 0 # 抓取高度
         
         mujoco.mj_resetData(self.sim, self.mj_data)
@@ -284,71 +344,135 @@ class InsertionEnv(gym.Env):
         # rand_yaw = 0
 
         steps_per_phase = 60
+        steps_per_phase = 40
 
-        for i in range(steps_per_phase): # go on top of object
-            self.mj_data.ctrl[:3] = [self.offset_x, self.offset_y, cruise_height]
-            mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
-            if show_full: # show the full trajectory
-                self.renderer.update_scene(self.mj_data, camera=0)
-                img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
-                cv2.imshow('img', img)
-                cv2.waitKey(10)
 
-        for i in range(steps_per_phase): # rotate wrist
-            self.mj_data.ctrl[3] = -np.arcsin(self.target_quat[-1])*2
-            mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
-            if show_full:
-                self.renderer.update_scene(self.mj_data, camera=0)
-                img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
-                cv2.imshow('img', img)
-                cv2.waitKey(10)
+        # for i in range(steps_per_phase): # go on top of object
+        #     self.mj_data.ctrl[:3] = [self.offset_x, self.offset_y, cruise_height]
+        #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
+        #     if show_full: # show the full trajectory
+        #         self.renderer.update_scene(self.mj_data, camera=0)
+        #         img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
+        #         cv2.imshow('img', img)
+        #         cv2.waitKey(10)
+
+        # for i in range(steps_per_phase): # rotate wrist
+        #     self.mj_data.ctrl[3] = -np.arcsin(self.target_quat[-1])*2
+        #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
+        #     if show_full:
+        #         self.renderer.update_scene(self.mj_data, camera=0)
+        #         img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
+        #         cv2.imshow('img', img)
+        #         cv2.waitKey(10)
             
-        for i in range(steps_per_phase): # move around object
-            self.mj_data.ctrl[:3] = [self.offset_x, self.offset_y, gripping_height]
-            mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
-            if show_full:
-                self.renderer.update_scene(self.mj_data, camera=0)
-                img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
-                cv2.imshow('img', img)
-                cv2.waitKey(10)
+        # for i in range(steps_per_phase): # move around object
+        #     self.mj_data.ctrl[:3] = [self.offset_x, self.offset_y, gripping_height]
+        #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
+        #     if show_full:
+        #         self.renderer.update_scene(self.mj_data, camera=0)
+        #         img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
+        #         cv2.imshow('img', img)
+        #         cv2.waitKey(10)
             
-        for i in range(steps_per_phase): # close gripper
-            # 降低夹取速度
-            self.mj_data.ctrl[-1] = self.fixed_gripping
-            mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
-            if show_full:
-                self.renderer.update_scene(self.mj_data, camera=0)
-                img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
-                cv2.imshow('img', img)
-                cv2.waitKey(10)
+        # for i in range(steps_per_phase): # close gripper
+        #     # 降低夹取速度
+        #     self.mj_data.ctrl[-1] = self.fixed_gripping
+        #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
+        #     if show_full:
+        #         self.renderer.update_scene(self.mj_data, camera=0)
+        #         img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
+        #         cv2.imshow('img', img)
+        #         cv2.waitKey(10)
             
-        for i in range(steps_per_phase): # lift object
-            self.mj_data.ctrl[:3] = [self.offset_x, self.offset_y, cruise_height]
-            mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
-            if show_full:
-                self.renderer.update_scene(self.mj_data, camera=0)
-                img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
-                cv2.imshow('img', img)
-                cv2.waitKey(10)
+        # for i in range(steps_per_phase): # lift object
+        #     self.mj_data.ctrl[:3] = [self.offset_x, self.offset_y, cruise_height]
+        #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
+        #     if show_full:
+        #         self.renderer.update_scene(self.mj_data, camera=0)
+        #         img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
+        #         cv2.imshow('img', img)
+        #         cv2.waitKey(10)
 
         
-        for i in range(steps_per_phase): # rotate in place
-            self.mj_data.ctrl[3] = -rand_yaw
-            mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
-            if show_full:
-                self.renderer.update_scene(self.mj_data, camera=0)
-                img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
-                cv2.imshow('img', img)
-                cv2.waitKey(10)
+        # for i in range(steps_per_phase): # rotate in place
+        #     self.mj_data.ctrl[3] = -rand_yaw
+        #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
+        #     if show_full:
+                # self.renderer.update_scene(self.mj_data, camera=0)
+                # img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
+                # cv2.imshow('img', img)
+                # cv2.waitKey(10)
             
-        for i in range(steps_per_phase): # move to random position
-            self.mj_data.ctrl[:3] = [rand_x, rand_y, cruise_height]
-            mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
-            if show_full:
-                self.renderer.update_scene(self.mj_data, camera=0)
-                img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
-                cv2.imshow('img', img)
-                cv2.waitKey(10)
+        # for i in range(steps_per_phase): # move to random position
+        #     self.mj_data.ctrl[:3] = [rand_x, rand_y, cruise_height]
+        #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
+        #     if show_full:
+        #         self.renderer.update_scene(self.mj_data, camera=0)
+        #         img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
+        #         cv2.imshow('img', img)
+        #         cv2.waitKey(10)
+
+
+
+
+        ##########################################
+        # new movements below
+        for _ in range(1):  # 抓取、放开、旋转
+            for i in range(steps_per_phase):  # 移动到物体附近
+                self.mj_data.ctrl[:3] = [self.offset_x, self.offset_y, gripping_height]
+                mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
+                # 实时更新触觉反馈
+                self.update_tactile_feedback(show_full)
+
+            for i in range(steps_per_phase):  # 旋转角度
+                self.mj_data.ctrl[3] = rand_yaw
+                mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
+                # 实时更新触觉反馈
+                self.update_tactile_feedback(show_full)
+
+            for i in range(steps_per_phase):  # 抓住物体
+                self.mj_data.ctrl[-1] = self.fixed_gripping
+                mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
+                # 实时更新触觉反馈
+                self.update_tactile_feedback(show_full)
+
+            for i in range(steps_per_phase): # lift object
+                self.mj_data.ctrl[:3] = [self.offset_x, self.offset_y, cruise_height]
+                mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
+                self.update_tactile_feedback(show_full)
+
+            for i in range(steps_per_phase): # lay down object
+                self.mj_data.ctrl[:3] = [self.offset_x, self.offset_y, gripping_height]
+                mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
+                self.update_tactile_feedback(show_full)
+
+
+
+            for i in range(steps_per_phase):  # 放开物体
+                self.mj_data.ctrl[-1] = 0  # 放开
+                mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
+                # 实时更新触觉反馈
+                self.update_tactile_feedback(show_full)
+                # if show_full:
+                #     self.renderer.update_scene(self.mj_data, camera=0)
+                #     img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
+                #     cv2.imshow('img', img)
+                #     cv2.waitKey(5)
+
+            for i in range(steps_per_phase):  # 旋转角度
+                self.mj_data.ctrl[3] = 0
+                mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
+                # 实时更新触觉反馈
+                self.update_tactile_feedback(show_full)
+                # if show_full:
+                #     self.renderer.update_scene(self.mj_data, camera=0)
+                #     img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
+                #     cv2.imshow('img', img)
+                #     cv2.waitKey(5)
+
+
+        ##########################################
+
 
         self.prev_action_xyz = np.array([rand_x, rand_y, cruise_height])
 
@@ -419,8 +543,8 @@ class InsertionEnv(gym.Env):
         
         info = {'id': np.array([self.id])}
 
+        
         return self._get_obs(), info
-
 
     def render(self, highres = False):
         ''' Render the current scene '''
@@ -438,58 +562,52 @@ class InsertionEnv(gym.Env):
 
         return img
 
+    # new step function
     def step(self, u):
         ''' Take a step in the environment '''
-
         action = u
         action = np.clip(u, -1., 1.)
-        
-        action_unnorm = (action + 1)/2 * (self.action_scale[:,1]-self.action_scale[:,0]) + self.action_scale[:,0] # unnormalize action
-        
+
+        # Unnormalize action
+        action_unnorm = (action + 1) / 2 * (self.action_scale[:, 1] - self.action_scale[:, 0]) + self.action_scale[:, 0]
 
         if self.max_delta is not None:
             action_unnorm = np.clip(action_unnorm[:3], self.prev_action_xyz - self.max_delta, self.prev_action_xyz + self.max_delta)
-        
+
         self.prev_action_xyz = action_unnorm
 
+        # 控制抓取力和旋转角度
         if self.with_rotation:
             self.mj_data.ctrl[3] = -action_unnorm[3]
         else:
             self.mj_data.ctrl[3] = 0
         if not self.adaptive_gripping:
-            self.mj_data.ctrl[-1] = self.fixed_gripping
+            self.mj_data.ctrl[-1] = self.fixed_gripping  # 保持固定抓取力
         else:
-            self.mj_data.ctrl[-1] = action_unnorm[-1]
-    
+            self.mj_data.ctrl[-1] = action_unnorm[-1]  # 控制抓取力
+
+        # 控制机械臂的位置
         self.mj_data.ctrl[:3] = action_unnorm[:3]
 
-        mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1) # skip frames
+        # 进行仿真步骤，更新状态
+        mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
 
-        pos = self.mj_data.qpos[-7:-4]
-        quat = self.mj_data.qpos[-4:]
-        
-        delta_x = pos[0] - self.offset_x
-        delta_y = pos[1] - self.offset_y
-        delta_z = pos[2] - self.init_z
-        delta_quat = np.linalg.norm(quat - self.target_quat)
-
-        reward = - np.log(100*np.sqrt(delta_x**2 + delta_y**2 + delta_z**2 + int(self.with_rotation)*delta_quat**2) + 1) # 误差越小，reward越大
-        
-        if self.state_type == 'vision_and_touch': 
+        # 实时更新触觉反馈
+        if self.state_type == 'vision_and_touch':
             tactiles_right = self.mj_data.sensor('touch_right').data.reshape((3, self.tactile_rows, self.tactile_cols))
-            tactiles_right = tactiles_right[[1, 2, 0]] # zxy -> xyz
+            tactiles_right = tactiles_right[[1, 2, 0]]  # 转换坐标轴顺序
             tactiles_left = self.mj_data.sensor('touch_left').data.reshape((3, self.tactile_rows, self.tactile_cols))
-            tactiles_left = tactiles_left[[1, 2, 0]] # zxy -> xyz
+            tactiles_left = tactiles_left[[1, 2, 0]]
             tactiles = np.concatenate((tactiles_right, tactiles_left), axis=0)
             if self.symlog_tactile:
                 tactiles = np.sign(tactiles) * np.log(1 + np.abs(tactiles))
             img = self.render()
             self.curr_obs = {'image': img, 'tactile': tactiles}
-            info = {'id': np.array([self.id])}
+
         elif self.state_type == 'vision':
             img = self.render()
             self.curr_obs = {'image': img}
-            info = {'id': np.array([self.id])}
+
         elif self.state_type == 'touch':
             tactiles_right = self.mj_data.sensor('touch_right').data.reshape((3, self.tactile_rows, self.tactile_cols))
             tactiles_right = tactiles_right[[1, 2, 0]]
@@ -499,20 +617,33 @@ class InsertionEnv(gym.Env):
             if self.symlog_tactile:
                 tactiles = np.sign(tactiles) * np.log(1 + np.abs(tactiles))
             self.curr_obs = {'tactile': tactiles}
-            info = {'id': np.array([self.id])}
+
         elif self.state_type == 'privileged':
-            self.curr_obs = {'state': np.concatenate((self.mj_data.qpos.copy(), self.mj_data.qvel.copy(), [self.offset_x,self.offset_y,self.offset_yaw]))}
-            info = {'id': np.array([self.id])}
+            self.curr_obs = {'state': np.concatenate((self.mj_data.qpos.copy(), self.mj_data.qvel.copy(), [self.offset_x, self.offset_y, self.offset_yaw]))}
 
+        # 计算奖励
+        pos = self.mj_data.qpos[-7:-4]
+        quat = self.mj_data.qpos[-4:]
+
+        delta_x = pos[0] - self.offset_x
+        delta_y = pos[1] - self.offset_y
+        delta_z = pos[2] - self.init_z
+        delta_quat = np.linalg.norm(quat - self.target_quat)
+
+        reward = -np.log(100 * np.sqrt(delta_x**2 + delta_y**2 + delta_z**2 + int(self.with_rotation) * delta_quat**2) + 1)
+
+        # 判断任务是否完成
         done = np.sqrt(delta_x**2 + delta_y**2 + delta_z**2) < 4e-3
-        info['is_success'] = done
-
         if done:
             reward = 1000
 
+        info = {'is_success': done}
+
+        # 返回观测结果、奖励、完成状态等
         obs = self._get_obs()
 
         print(">>>>>>>>>>reward: ", reward)
 
         return obs, reward, done, False, info
-        
+
+

@@ -2,7 +2,10 @@
 import pandas as pd
 
 # Load the CSV file
-data = pd.read_csv('/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/tactile_envs/assets/insertion/old_marker_coordinate.csv')
+# data = pd.read_csv('/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/tactile_envs/assets/insertion/old_marker_coordinate.csv')
+
+# 理想的标记点坐标
+data = pd.read_csv('../ideal_markers.csv') 
 
 print(data.keys())
 # data = np.load('/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/tactile_envs/assets/insertion/old_marker_coordinate.csv', allow_pickle=True)
@@ -23,4 +26,9 @@ print("...")
 # data = data.iloc[0:]
 # Remove the first row and the 'x', 'y', 'z' columns
 # data = data.drop(index=0).drop(columns=['x', 'y', 'z'])
-data.to_csv('/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/tactile_envs/assets/insertion/marker_coordinate.csv', index=False)
+
+# 实测的标记点坐标
+# data.to_csv('/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/tactile_envs/assets/insertion/marker_coordinate.csv', index=False)
+
+# 理想的标记点坐标
+data.to_csv('/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/tactile_envs/assets/insertion/markers/t_ideal_markers.csv', index=False)

@@ -1,0 +1,16 @@
+{"time":"2024-11-09T23:35:59.99255+08:00","level":"INFO","msg":"using version","core version":"0.18.6"}
+{"time":"2024-11-09T23:35:59.992647+08:00","level":"INFO","msg":"created symlink","path":"/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/wandb/run-20241109_233559-y40xg89g/logs/debug-core.log"}
+{"time":"2024-11-09T23:36:03.14176+08:00","level":"INFO","msg":"created new stream","id":"y40xg89g"}
+{"time":"2024-11-09T23:36:03.141823+08:00","level":"INFO","msg":"stream: started","id":"y40xg89g"}
+{"time":"2024-11-09T23:36:03.141886+08:00","level":"INFO","msg":"sender: started","stream_id":"y40xg89g"}
+{"time":"2024-11-09T23:36:03.141865+08:00","level":"INFO","msg":"handler: started","stream_id":{"value":"y40xg89g"}}
+{"time":"2024-11-09T23:36:03.14189+08:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"y40xg89g"}}
+{"time":"2024-11-09T23:36:04.69402+08:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-09T23:36:07.327832+08:00","level":"INFO","msg":"stream: closing","id":"y40xg89g"}
+{"time":"2024-11-09T23:36:07.327879+08:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-09T23:36:07.328222+08:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-09T23:36:14.581132+08:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-09T23:36:15.360449+08:00","level":"INFO","msg":"sender: closed","stream_id":"y40xg89g"}
+{"time":"2024-11-09T23:36:15.360438+08:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"y40xg89g"}}
+{"time":"2024-11-09T23:36:15.360445+08:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"y40xg89g"}}
+{"time":"2024-11-09T23:36:15.360961+08:00","level":"INFO","msg":"stream: closed","id":"y40xg89g"}

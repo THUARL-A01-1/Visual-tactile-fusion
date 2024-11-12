@@ -1,0 +1,39 @@
+grasping_rl/
+├── config/
+│   ├── __init__.py
+│   ├── train_config.yaml        # 训练相关的配置参数
+│   └── env_config.yaml          # 环境相关的配置参数
+│
+├── envs/
+│   ├── __init__.py
+│   ├── grasp_env.py            # 主要的抓取环境类
+│   └── utils/
+│       ├── __init__.py
+│       ├── reward_functions.py  # 奖励函数定义
+│       └── observation_utils.py # 观察空间处理工具
+│
+├── models/
+│   ├── __init__.py
+│   ├── networks.py             # 自定义网络架构
+│   └── custom_policies.py      # 自定义策略网络
+│
+├── scripts/
+│   ├── train.py               # 训练脚本
+│   ├── evaluate.py            # 评估脚本
+│   └── visualize.py           # 可视化脚本
+│
+├── utils/
+│   ├── __init__.py
+│   ├── logger.py              # 日志工具
+│   └── callbacks.py           # 训练回调函数
+│
+├── data/
+│   ├── trained_models/        # 保存训练好的模型
+│   └── logs/                  # 训练日志
+│
+├── requirements.txt
+└── README.md
+
+
+在 scene.xml 321行修改待抓取物体的形状
+运行 tactile_envs/assets/insertion/complex_objects/shape_generator.py 生成新的物体形状

@@ -79,26 +79,25 @@ def main():
                         scale=args.scale, size_x=size_x, size_y=size_y, size_z=args.size_z)
 
     # Create sensor configuration file
-    touch_sensor_string = f"""
-    <mujoco>
-    <sensor>
-        <plugin name="touch_right" plugin="mujoco.sensor.touch_grid" objtype="site" objname="touch_right">
-            <config key="size" value="{args.num_rows} {args.num_rows}"/>
-            <config key="fov" value="18 18"/>
-            <config key="gamma" value="0"/>
-            <config key="nchannel" value="3"/>
-        </plugin>
-    </sensor>
-    <sensor>
-        <plugin name="touch_left" plugin="mujoco.sensor.touch_grid" objtype="site" objname="touch_left">
-            <config key="size" value="{args.num_rows} {args.num_rows}"/>
-            <config key="fov" value="18 18"/>
-            <config key="gamma" value="0"/>
-            <config key="nchannel" value="3"/>
-        </plugin>
-    </sensor>
-    </mujoco>
-    """
+    touch_sensor_string = f"""<mujoco>
+<sensor>
+    <plugin name="touch_right" plugin="mujoco.sensor.touch_grid" objtype="site" objname="touch_right">
+        <config key="size" value="{args.num_rows} {args.num_rows}"/>
+        <config key="fov" value="18 18"/>
+        <config key="gamma" value="0"/>
+        <config key="nchannel" value="3"/>
+    </plugin>
+</sensor>
+<sensor>
+    <plugin name="touch_left" plugin="mujoco.sensor.touch_grid" objtype="site" objname="touch_left">
+        <config key="size" value="{args.num_rows} {args.num_rows}"/>
+        <config key="fov" value="18 18"/>
+        <config key="gamma" value="0"/> 
+        <config key="nchannel" value="3"/>
+    </plugin>
+</sensor>
+</mujoco>
+"""
 
     # Save the sensor configuration file
     with open("tactile_envs/assets/insertion/custom_touch_sensors.xml", "w") as f:

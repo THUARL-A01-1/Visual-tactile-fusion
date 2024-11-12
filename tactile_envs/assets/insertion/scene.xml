@@ -26,6 +26,11 @@
     <mesh class="2f85" file="silicone_pad.stl"/>
     <mesh class="2f85" file="spring_link.stl"/>
 
+    <!-- objects and holders -->
+    <mesh class="objects" name="custom_table" file="custom_table.stl"/>
+    <mesh class="objects" name="custom_obj" file="custom_obj.stl"/>
+    <mesh class="objects" name="unit_cube" file="unit_cube.stl"/>
+    <!-- old objects and holders -->
     <mesh class="objects" name="holder1" file="holder1.stl"/>
     <mesh class="objects" name="holder2" file="holder2.stl"/>
     <mesh class="objects" name="holder3" file="holder3.stl"/>
@@ -295,6 +300,8 @@
     <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
   </asset>
 
+
+  <!--  -->
   <worldbody>
     <light pos="0 0 1"/>
     <light pos="0 -0.2 1" dir="0 0.2 -0.8" directional="true"/>
@@ -303,26 +310,21 @@
     <camera pos="0.0 0.0 0.9" xyaxes="1.000 0 -0.000 0.00 1.000 0.00"/>
     <camera pos="0.0 0.0 0.5" xyaxes="1.000 0 -0.000 0.00 1.000 0.00"/>
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
-    <body name="object" pos="0. 0 0." axisangle="0 0 1 0.0">
-      <joint type="free" name="object_jnt"/>
-      <geom class="visual" name="peg_visual" mesh="triangle" rgba="0.8 0.8 0.1 1" friction=".8"/>
-      <geom class="collision" name="peg_collision" mesh="triangle" friction=".8"/>
-      <geom class="visual" name="holder_visual" mesh="holder1" rgba="0.8 0.8 0.1 1" friction=".5"/>
-      <geom class="collision" name="holder_collision" mesh="holder1" friction=".5"/>
-      <!-- 在这里添加物体的质量定义 kg -->
-      <inertial mass="0.15" pos="0 0 0" diaginertia="0.01 0.01 0.01"/>
-    </body>
-    <body name="walls" pos="0 0 0.00" axisangle="0 0 1 0.0">
-      <geom class="visual" name="wall1_visual" mesh="triangle_wall1" rgba="0.5 0.5 0.5 1" friction=".3" priority="1" solref="0.007 1"/>
-      <geom class="collision" name="wall1_collision" mesh="triangle_wall1" friction=".3" priority="1" solref="0.007 1"/>
-      <geom class="visual" name="wall2_visual" mesh="triangle_wall2" rgba="0.5 0.5 0.5 1" friction=".3" priority="1" solref="0.007 1"/>
-      <geom class="collision" name="wall2_collision" mesh="triangle_wall2" friction=".3" priority="1" solref="0.007 1"/>
-      <geom class="visual" name="wall3_visual" mesh="triangle_wall3" rgba="0.5 0.5 0.5 1" friction=".3" priority="1" solref="0.007 1"/>
-      <geom class="collision" name="wall3_collision" mesh="triangle_wall3" friction=".3" priority="1" solref="0.007 1"/>
-      <geom class="visual" name="wall4_visual" mesh="triangle_wall4" rgba="0.5 0.5 0.5 1" friction=".3" priority="1" solref="0.007 1"/>
-      <geom class="collision" name="wall4_collision" mesh="triangle_wall4" friction=".3" priority="1" solref="0.007 1"/>
-    </body>
     
+    <!-- <body name="object" pos="0 0 0." axisangle="0 0 1 0.0">
+      <joint type="free" name="object_jnt"/>
+      <geom class="visual" name="peg_visual" mesh="unit_cube" rgba="0.8 0.8 0.1 1" friction=".8"/>
+      <geom class="collision" name="peg_collision" mesh="unit_cube" friction=".8"/>
+    </body> -->
+
+    <!-- object to be grasped -->
+    <!-- <include file="complex_objects/discrete_2d/I1.xml"/> -->
+    <include file="complex_objects/continue_1d/obj_1.xml"/>
+
+    <body name="walls" pos="0 0 0.00" axisangle="0 0 1 0.0">
+      <!-- <geom class="visual" name="table_visual" mesh="custom_obj" rgba="0.5 0.5 0.5 1" friction=".3" priority="1" solref="0.007 1"/>
+      <geom class="collision" name="table_collision" mesh="custom_obj" friction=".3" priority="1" solref="0.007 1"/> -->
+    </body>
   </worldbody>
 
   <keyframe>

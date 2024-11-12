@@ -19,3 +19,15 @@ WARNING: Insufficient arena memory for the number of constraints generated. Incr
 Mon Oct 14 12:02:31 2024
 WARNING: mju_openResource: unknown file '/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/tactile_envs/envs/Gymnasium-Robotics/gymnasium_robotics/envs/assets/hand/custom_touch_sensors.xml'
 
+Sat Nov  2 03:18:16 2024
+WARNING: mju_openResource: unknown file '/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/tactile_envs/assets/insertion/complex_objects/T1_obj.xml'
+
+Sat Nov  2 03:20:46 2024
+WARNING: mju_openResource: unknown file '/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/tactile_envs/assets/insertion/complex_objects/T1_obj.xml'
+
+Sat Nov  2 03:21:34 2024
+WARNING: mju_openResource: unknown file '/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/tactile_envs/assets/insertion/complex_objects/T1_obj.xml'
+
+Tue Nov 12 01:50:38 2024
+WARNING: mju_openResource: unknown file 'left_custom_pad_collisions.xml'
+

@@ -1,0 +1,21 @@
+环境创建成功！
+state_type:  vision_and_touch
+ndof_u:  3
+Using cpu device
+Traceback (most recent call last):
+  File "/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/scripts/train.py", line 172, in <module>
+    main()
+  File "/Users/xiaokangsun/local_py_proj/Visual-tactile-fusion/scripts/train.py", line 111, in main
+    model.learn(
+  File "/Users/xiaokangsun/local_py_proj/tactile_envs/lib/python3.12/site-packages/stable_baselines3/ppo/ppo.py", line 315, in learn
+    return super().learn(
+           ^^^^^^^^^^^^^^
+  File "/Users/xiaokangsun/local_py_proj/tactile_envs/lib/python3.12/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 287, in learn
+    total_timesteps, callback = self._setup_learn(
+                                ^^^^^^^^^^^^^^^^^^
+  File "/Users/xiaokangsun/local_py_proj/tactile_envs/lib/python3.12/site-packages/stable_baselines3/common/base_class.py", line 431, in _setup_learn
+    self._logger = utils.configure_logger(self.verbose, self.tensorboard_log, tb_log_name, reset_num_timesteps)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xiaokangsun/local_py_proj/tactile_envs/lib/python3.12/site-packages/stable_baselines3/common/utils.py", line 201, in configure_logger
+    raise ImportError("Trying to log data to tensorboard but tensorboard is not installed.")
+ImportError: Trying to log data to tensorboard but tensorboard is not installed.

@@ -1,0 +1,30 @@
+<mujoco model="complex_object">
+    <body name="complex_object" pos="0 0 0">
+        <joint type="free" name="complex_object_jnt"/>
+        <body name="cube_1" pos="0 0 0" axisangle="0 0 1 0">
+            <geom class="visual" name="cube_visual_1" mesh="unit_cube" size="0.02" rgba="0.8 0.8 0.1 1" friction="0.8"/>
+            <geom class="collision" name="cube_collision_1" mesh="unit_cube" size="0.02" friction="0.8"/>
+            <inertial mass="0.05" pos="0 0 0" diaginertia="0.0005 0.0005 0.0005"/>
+        </body>
+        <body name="cube_2" pos="0.03 0 0" axisangle="0 0 1 0">
+            <geom class="visual" name="cube_visual_2" mesh="unit_cube" size="0.02" rgba="0.8 0.8 0.1 1" friction="0.8"/>
+            <geom class="collision" name="cube_collision_2" mesh="unit_cube" size="0.02" friction="0.8"/>
+            <inertial mass="0.05" pos="0 0 0" diaginertia="0.0005 0.0005 0.0005"/>
+        </body>
+        <body name="cube_3" pos="-0.03 0 0" axisangle="0 0 1 0">
+            <geom class="visual" name="cube_visual_3" mesh="unit_cube" size="0.02" rgba="0.8 0.8 0.1 1" friction="0.8"/>
+            <geom class="collision" name="cube_collision_3" mesh="unit_cube" size="0.02" friction="0.8"/>
+            <inertial mass="0.175" pos="0 0 0" diaginertia="0.0017499999999999998 0.0017499999999999998 0.0017499999999999998"/>
+        </body>
+        <body name="cube_4" pos="0.03 0.03 0" axisangle="0 0 1 0">
+            <geom class="visual" name="cube_visual_4" mesh="unit_cube" size="0.02" rgba="0.8 0.8 0.1 1" friction="0.8"/>
+            <geom class="collision" name="cube_collision_4" mesh="unit_cube" size="0.02" friction="0.8"/>
+            <inertial mass="0.175" pos="0 0 0" diaginertia="0.0017499999999999998 0.0017499999999999998 0.0017499999999999998"/>
+        </body>
+        <body name="cube_5" pos="0.03 -0.03 0" axisangle="0 0 1 0">
+            <geom class="visual" name="cube_visual_5" mesh="unit_cube" size="0.02" rgba="0.8 0.8 0.1 1" friction="0.8"/>
+            <geom class="collision" name="cube_collision_5" mesh="unit_cube" size="0.02" friction="0.8"/>
+            <inertial mass="0.05" pos="0 0 0" diaginertia="0.0005 0.0005 0.0005"/>
+        </body>
+    </body>
+</mujoco>

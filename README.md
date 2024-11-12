@@ -28,7 +28,7 @@ python tactile_envs/assets/insertion/generate_pad_collisions.py --nx 32 --ny 32
 
 
 ## Preparation
-### STL Coordinate Transformation
+### 3D Model Coordinate Transformation
 To rotate and transform the coordinate of tactile sensor .stl file, run:
 ``` bash
 python STL_trans/stl_trans.py

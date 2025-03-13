@@ -1,5 +1,5 @@
 '''
-PPO使用的网络架构
+Network architecture used in PPO
 '''
 import torch
 import torch.nn as nn
@@ -22,15 +22,13 @@ class SharedMLPNetwork(nn.Module):
         return self.shared_net(x)
 
 class PolicyNetwork(nn.Module):
-    """PPO的策略网络"""
+    """PPO policy network"""
     def __init__(self, input_dim, action_dim):
         super(PolicyNetwork, self).__init__()
         
         self.shared_net = SharedMLPNetwork(input_dim)
-        
-        # 动作均值输出层
+    
         self.action_mean = nn.Linear(64, action_dim)
-        # 动作标准差输出层 (log_std以确保标准差为正)
         self.action_log_std = nn.Parameter(torch.zeros(action_dim))
         
     def forward(self, x):
@@ -40,7 +38,7 @@ class PolicyNetwork(nn.Module):
         return action_mean, action_std
 
 class ValueNetwork(nn.Module):
-    """PPO的价值网络"""
+    """PPO value network"""
     def __init__(self, input_dim):
         super(ValueNetwork, self).__init__()
         

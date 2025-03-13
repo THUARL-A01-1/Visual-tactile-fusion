@@ -1,0 +1,8 @@
+<mujoco model="1d_object">
+    <body name="1d_object" pos="0 0 0">
+        <joint type="free" name="1d_object_jnt"/>
+        <geom class="visual" name="object_visual" type="box" size="0.1 0.02 0.02" rgba="0.8 0.2 0.2 1" friction="1.0"/>
+        <geom class="collision" name="object_collision" type="box" size="0.1 0.02 0.02" friction="1.0"/>
+        <inertial mass="0.5" pos="0.02777694948124304 0 0" diaginertia="0.005 0.005 0.005"/>
+    </body>
+</mujoco>

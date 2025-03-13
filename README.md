@@ -1,19 +1,60 @@
-# tactile_envs
+# Visual-tactile Fusion-based Failure Recovery RL
+## Stucture
+### scripts
+``` text
+scripts/
+├── stl_process/
+│   ├── stl_files/
+│   ├── stl_generator.py
+│   └── stl_trans.py
+├── test_random_grasp.py # 环境测试调试脚本
+└── train_from_failure.py # 训练主脚本
+```
 
-Collection of MuJoCo robotics environments equipped with both vision and tactile sensing. <br> The environments are built on top of Gymnasium.
-
-![](teaser.png)
-
-![](teaser.png)
-
-Current available environments:
-* `tactile_envs/Insertion-v0` (see [Insertion](scripts/test_env_insertion.py))
-* `Door` (see [Door](scripts/test_env_door.py))
-* `HandManipulateBlockRotateZFixed-v1` (see [HandManipulateBlockRotateZFixed](scripts/test_env_hand.py))
-* `HandManipulateEggRotateFixed-v1` (see [HandManipulateEggRotateFixed](scripts/test_env_hand.py))
-* `HandManipulatePenRotateFixed-v1` (see [HandManipulatePenRotateFixed](scripts/test_env_hand.py))
+### models
+``` text
+models/
+├── ppo_grasp_1d_v1/
+├── custom_policies.py
+└── networks.py
+```
+### tactile_envs
+``` text
+tactile_envs/
+├── __init__.py
+├── envs/
+│   ├── __init__.py
+│   ├── insertion.py        # 最重要，定义 GraspPhase 类
+│   ├── regrasp1d.py       # 1D抓取环境
+│   └── regrasp2d.py       # 2D抓取环境，未实现
+└── assets/
+│   ├── ...
+│   └── insertion
+│       ├── assets          # stl 模型文件
+│       ├── complex_objects # 自定义的待抓取物体
+│       │   ├── continue_1d # 质心位置连续随机分布的 1d 物体
+│       │   ├── discrete_2d # 质心位置离散随机分布（小质量块连接）的 2d 物体
+│       │   ├── continue_1d_gen.py # 生成 continue_1d
+│       │   ├── discrete_2d_gen.py # 生成 discrete_2d
+│       │   ├── shape_generator.py # 形状生成器
+│       ├── markers # 触觉传感器标记点
+│       ├── custom_touch_sensors.xml 
+│       ├── generate_pads_collisions.py  # 生成 xml
+│       ├── left_custom_pad_collisions.xml
+│       ├── right_custom_pad_collisions.xml
+│       └── scene.xml 
+└── utils/
+   └── ...
+```
 
 ## Installation
+### Choice 1: venv
+```bash
+cd tactile_envs # 按原仓库教程安装 tactile_envs 环境，并且进入 tactile_envs 文件夹工作区
+source ../tactile_envs/bin/activate # 激活虚拟环境
+``` 
+### Choice 2: conda 
+
 To install `tactile_envs` in a fresh conda env:
 ```
 conda create --name tactile_envs python=3.11
@@ -55,10 +96,10 @@ In the files below you can modify object attributes, movement modes, etc. Refer 
 
 
 ## Test the available environment:
-The script `test_env_grip.py` tests a gripping environment with tactile and visual information using `gymnasium` and `tactile_envs`. The main function, `test_env`, simulates robotic gripping tasks where you can control key environment parameters such as the number of episodes, steps, state type (e.g., `vision_and_touch`, `vision`, `touch`), and image size through command-line arguments.
+The script `train_from_failure.py` tests a gripping environment with tactile and visual information using `gymnasium` and `tactile_envs`. The main function, `test_env`, simulates robotic gripping tasks where you can control key environment parameters such as the number of episodes, steps, state type (e.g., `vision_and_touch`, `vision`, `touch`), and image size through command-line arguments.
 ### Example Usage
 ``` bash
-python scripts/test_env_grip.py --n_episodes 50 --n_steps 500 --show_highres --state_type vision_and_touch
+python scripts/train_from_failure.py --n_episodes 50 --n_steps 500 --show_highres --state_type vision_and_touch
 ```
 This command runs 50 episodes, with 500 steps per episode, using tactile information only and high-resolution images.
 Available parameters including: `--n_episodes`, `--n_steps`, `--show_highres`, `--seed`, `--env_name`, `--state_type`, `--multiccd`, `--im_size`, `--no_gripping`, `--no_rotation`, `--tactile_shape`, `--max_delta`. To see all available options and defaults, use:

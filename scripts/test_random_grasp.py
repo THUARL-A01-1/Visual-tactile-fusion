@@ -1,3 +1,7 @@
+"""
+暂时不用处理此脚本，用于测试随机抓取环境
+"""
+
 import gymnasium as gym
 import tactile_envs
 import matplotlib.pyplot as plt
@@ -34,109 +38,75 @@ def parse_arguments():
 
     return parser.parse_args()
 
+def print_parameters(env_name, state_type, multiccd, no_gripping, no_rotation, 
+                    show_highres, seed, n_episodes, n_steps, tactile_shape, 
+                    im_size, max_delta):
+    """打印运行参数"""
+    print("\nconfig:")
+    print("="*50)
+    print(f"env_name: {env_name}")
+    print(f"state_type: {state_type}")
+    print(f"multiccd: {multiccd}")
+    print(f"no_gripping: {no_gripping}")
+    print(f"no_rotation: {no_rotation}")
+    print(f"show_highres: {show_highres}")
+    print(f"random seed: {seed}")
+    print(f"n_episodes: {n_episodes}")
+    print(f"n_steps: {n_steps}")
+    print(f"tactile_shape: {tactile_shape}")
+    print(f"im_size: {im_size}")
+    print(f"max_delta: {max_delta}")
+    print("="*50 + "\n")
+
 def test_env(n_episodes=100, n_steps=300, show_highres=False, seed=42, 
-                  env_name="tactile_envs/Regrasp-v0", state_type='vision_and_touch',
-                  multiccd=False, im_size=480, no_gripping=False, no_rotation=False,
-                  tactile_shape=(20,20), max_delta=None):
-    """
-    Function to test the gripping with tactile information in a given environment.
-
-    Parameters:
-    - n_episodes (int): Number of episodes to run.
-    - n_steps (int): Maximum steps per episode.
-    - show_highres (bool): Whether to show high-resolution images.
-    - seed (int or None): Random seed for environment reset. If None, a random seed is generated.
-    - env_name (str): The name of the environment to create.
-    - state_type (str): Type of state information used (e.g., 'vision_and_touch').
-    - multiccd (bool): Whether to enable multi-CCD.
-    - im_size (int): Image size used in the environment.
-    - no_gripping (bool): Whether to disable gripping.
-    - no_rotation (bool): Whether to disable rotation.
-    - tactile_shape (tuple): Shape of the tactile sensor input.
-    - max_delta (float or None): Maximum delta for tactile data.
-    """
-
-    def print_parameters():
-        # Print all the parameters to show what values are being used
-        print("\nRunning with the following configuration")
-        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-        print(f"env_name: {env_name}")
-        print(f"state_type: {state_type}")
-        print(f"multiccd: {multiccd}")
-        print(f"no_gripping: {no_gripping}")
-        print(f"no_rotation: {no_rotation}")
-        print(f"show_highres: {show_highres}")
-        print(f"random seed: {seed}")
-        print(f"n_episodes: {n_episodes}")
-        print(f"n_steps: {n_steps}")
-        print(f"tactile_shape: {tactile_shape}")
-        print(f"im_size: {im_size}")
-        print(f"max_delta: {max_delta}")
-        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+             env_name="tactile_envs/Regrasp-v0", state_type='vision_and_touch',
+             multiccd=False, im_size=480, no_gripping=False, no_rotation=False,
+             tactile_shape=(20,20), max_delta=None):
     
-    print_parameters()
-
-    env = gym.make(env_name, state_type=state_type, multiccd=multiccd, im_size=im_size, 
-                   no_gripping=no_gripping, no_rotation=no_rotation, 
-                   tactile_shape=tactile_shape, max_delta=max_delta)
-
-    np.random.seed(seed)  # Set the random seed for numpy operations
+    print_parameters(env_name, state_type, multiccd, no_gripping, no_rotation,
+                    show_highres, seed, n_episodes, n_steps, tactile_shape,
+                    im_size, max_delta)
     
-    for j in range(n_episodes):
-        env.reset()
-        tic = time.time()
-        print("\nEpisode ", j+1, " started.")
-
-        for i in range(n_steps):
-            print("[step:", i,"], phase:", env.grasp_sequence[env.grasp_phase])
-            action = env.action_space.sample()
-
-            obs, reward, terminated, truncated, info = env.step(action) # execute the action
-
-            tactile_data = obs['tactile']
-            img_data = obs['image']
-
-            temp_image_save_path = f"data/temp_obs/obs_{j}_{i}_image.npy"
-            temp_tactile_save_path = f"data/temp_obs/obs_{j}_{i}_tactile.npy"
-
-            # save the image data
-            np.save(temp_image_save_path, img_data)
-            print(f"Obs image saved to \"{temp_image_save_path}\"")
-
-            # save the tactile data
-            np.save(temp_tactile_save_path, tactile_data)
-            print(f"Obs tactile saved to \"{temp_tactile_save_path}\"")
-
-            # tactile_data shape is (6,20,20), the first 3 channels are the right tactile sensors, 
-            # the last 3 channels are the left tactile sensors
-            # y direction tactile sum
-            y_sum_right = np.sum(tactile_data[1,:,:]) # right sensor y direction sum
-            y_sum_left = np.sum(tactile_data[4,:,:])  # left sensor y direction sum
-            total_y_sum = y_sum_right + y_sum_left
-            print("Y direction tactile sum: ", -total_y_sum, "N (Gravity direction)")
-            # x direction tactile sum
-            x_sum_right = np.sum(tactile_data[0,:,:]) # right sensor x direction sum
-            x_sum_left = np.sum(tactile_data[3,:,:])  # left sensor x direction sum
-            total_x_sum = x_sum_right + x_sum_left
-            print("X direction tactile sum: ", total_x_sum, "N")
-            # z direction tactile sum
-            z_sum_right = np.sum(tactile_data[2,:,:]) # right sensor z direction sum
-            z_sum_left = np.sum(tactile_data[5,:,:])  # left sensor z direction sum
-            total_z_avg = (z_sum_right + z_sum_left)/2
-            print("Z direction tactile avg: ", total_z_avg, "N")
-            
-            
-            done = terminated or truncated # check if the episode is done
-            if done:
-                print(f"Episode {j+1} done after {i+1} steps.")
-                break
+    try:
+        print("creating environment...")
+        env = gym.make(env_name, state_type=state_type, multiccd=multiccd, im_size=im_size, 
+                      no_gripping=no_gripping, no_rotation=no_rotation, 
+                      tactile_shape=tactile_shape, max_delta=max_delta)
         
-        toc = time.time() # time cost of the episode
-        print(f"Episode {j+1} completed in {toc - tic:.2f} seconds.\n")
+        print("environment created successfully, start testing...")
+        for episode in range(n_episodes):
+            print(f"\nstart episode {episode + 1}")
+            print("="*50)
+            
+            obs, info = env.reset()
+            done = False
+            episode_reward = 0
+            
+            while not done:
+                # 生成随机动作
+                action = env.action_space.sample()
+                
+                # 执行动作
+                obs, reward, terminated, truncated, info = env.step(action)
+                episode_reward += reward
+                done = terminated or truncated
+                
+                # 渲染环境
+                if show_highres:
+                    env.render()
+            
+            print(f"episode {episode + 1} finished")
+            print(f"total reward: {episode_reward}")
+            print("="*50)
+            
+    except Exception as e:
+        print(f"error during testing: {str(e)}")
+        import traceback
+        traceback.print_exc()
     
-    if show_highres:
-        print("Displaying high-resolution images (Note: This might be slow).")
-        # Add any additional code to display highres images here if needed.
+    finally:
+        env.close()
+        print("\ntesting finished")
 
 def main():
     ''' Main function to test the gripping with tactile information in the environment. '''

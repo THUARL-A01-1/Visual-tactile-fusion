@@ -9,10 +9,11 @@ import mujoco
 import numpy as np
 from gymnasium import spaces
 import cv2
+from enum import Enum
 
 from pathlib import Path
 
-
+# external functions
 def get_objects_list():
     ''' Get the list of objects '''
     objects_list = []
@@ -43,13 +44,21 @@ def convert_observation_to_space(observation):
     return space
 
 
-
+class GraspPhase(Enum):
+    """
+    define the four phases of grasping
+    """
+    APPROACH = 0
+    GRASP = 1
+    LIFT = 2
+    HOLD = 3
 
 class RegraspEnv(gym.Env):
 
     def __init__(self, no_rotation=True, 
         no_gripping=True, state_type='vision_and_touch', camera_idx=0, symlog_tactile=True, 
-        env_id = -1, im_size=128, tactile_shape=(20,20), skip_frame=5, max_delta=None, multiccd=False):
+        env_id = -1, im_size=128, tactile_shape=(20,20), skip_frame=5, max_delta=None, multiccd=False,
+        render_mode=None):
 
         """
         'no_rotation': if True, the robot will not be able to rotate its wrist
@@ -63,13 +72,29 @@ class RegraspEnv(gym.Env):
         'skip_frame': number of frames to skip between actions
         'max_delta': maximum change allowed in the x, y, z position
         'multiccd': if True, the multiccd flag will be enabled (makes tactile sensing more accurate but slower) # multiple-contact collision detection
+        'render_mode': the mode for rendering the environment
         """
+
+        # render mode   
+        self.render_mode = render_mode
+
+        # validate input parameters
+        valid_state_types = ['privileged', 'vision', 'touch', 'vision_and_touch']
+        if state_type not in valid_state_types:
+            raise ValueError(f"state_type must be one of {valid_state_types}")
+        
+        if not isinstance(tactile_shape, tuple) or len(tactile_shape) != 2:
+            raise ValueError("tactile_shape must be a tuple of length 2")
+        
+        if skip_frame < 1:
+            raise ValueError("skip_frame must be positive")
 
         super(RegraspEnv, self).__init__()
 
-        self.id = env_id
-
-        self.skip_frame = skip_frame # number of frames to skip between actions
+        self.id: int = env_id
+        self.skip_frame: int = skip_frame
+        self.multiccd: bool = multiccd
+        self.fixed_gripping: float = 160.0
         
         asset_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../assets')
 
@@ -79,12 +104,6 @@ class RegraspEnv(gym.Env):
             self.xml_content = f.read()
             self.update_include_path()
             self.xml_content_reference = self.xml_content
-
-        self.multiccd = multiccd # if True, the multiccd flag will be enabled
-
-        # adjustable parameter
-        # the larger the value, the greater the gripping force
-        self.fixed_gripping = 160  # fixed gripper value
 
         self.max_delta = max_delta
 
@@ -152,23 +171,29 @@ class RegraspEnv(gym.Env):
             self.action_mask[4] = False
         self.action_scale = self.action_scale[self.action_mask]
         
-        self.renderer = mujoco.Renderer(self.sim, height=self.im_size, width=self.im_size)
+        # initialize the renderer based on the render mode
+        if self.render_mode == 'human':
+            self.renderer = mujoco.Renderer(self.sim, height=self.im_size, width=self.im_size)
         
-        # 关于抓取动作过程
-        self.grasp_phase = 0  # 当前抓取阶段
-        self.grasp_sequence = [
-            'approach',  # 接近物体
-            'grasp',     # 闭合夹爪
-            'lift',      # 提起物体
-            'hold'     # 保持
-            #'place',     # 放下
-            #'release'    # 释放夹爪
-        ]
-        # 定义关键高度参数
-        self.cruise_height = -0.03    # 巡航高度
-        self.gripping_height = -0.13  # 抓取高度
-        self.steps_per_phase = 60  # 每个阶段的步数
-
+        self.CRUISE_HEIGHT: float = -0.03    # cruise height
+        self.GRIPPING_HEIGHT: float = -0.13  # gripping height
+        self.STEPS_PER_PHASE: int = 60      # steps per phase
+        
+        # initialize the step counter and phase
+        self.current_step = 0
+        self.max_steps = 300  # can be adjusted as needed
+        
+        # define the number of steps per phase
+        self.phase_steps = {
+            GraspPhase.APPROACH: 1,  # approach phase
+            GraspPhase.GRASP: 1,    # grasp phase
+            GraspPhase.LIFT: 1,     # lift phase
+            GraspPhase.HOLD: 1      # hold phase
+        }
+        
+        # initialize the current phase
+        self.current_phase = GraspPhase.APPROACH
+        
         # print information
         print("ndof_u: ", self.ndof_u) # number of degrees of freedom
         print("object: ", self.object) # object name
@@ -243,31 +268,40 @@ class RegraspEnv(gym.Env):
         self.target_quat = np.array([np.cos(offset_yaw/2), 0, 0, np.sin(offset_yaw/2)])
 
     def update_tactile_feedback(self, show_full=False):
-        ''' Update the tactile feedback and display the image '''
-        if self.state_type == 'vision_and_touch' or self.state_type == 'touch':
-            tactiles_right = self.mj_data.sensor('touch_right').data.reshape((3, self.tactile_rows, self.tactile_cols))
-            tactiles_right = tactiles_right[[1, 2, 0]] 
-            tactiles_left = self.mj_data.sensor('touch_left').data.reshape((3, self.tactile_rows, self.tactile_cols))
-            tactiles_left = tactiles_left[[1, 2, 0]]
-            tactiles = np.concatenate((tactiles_right, tactiles_left), axis=0) # 6 * 20 * 20
-            
-            if self.symlog_tactile:
-                tactiles = np.sign(tactiles) * np.log(1 + np.abs(tactiles))
-            
-            if self.state_type == 'vision_and_touch':
-                img = self.render()
-                self.curr_obs = {'image': img, 'tactile': tactiles}
-            else:
-                self.curr_obs = {'tactile': tactiles}
+        """
+        Update tactile feedback and display image.
+        
+        Args:
+            show_full (bool): whether to display the full simulation image
+        """
+        try:
+            if self.state_type == 'vision_and_touch' or self.state_type == 'touch':
+                tactiles_right = self.mj_data.sensor('touch_right').data.reshape((3, self.tactile_rows, self.tactile_cols))
+                tactiles_right = tactiles_right[[1, 2, 0]] 
+                tactiles_left = self.mj_data.sensor('touch_left').data.reshape((3, self.tactile_rows, self.tactile_cols))
+                tactiles_left = tactiles_left[[1, 2, 0]]
+                tactiles = np.concatenate((tactiles_right, tactiles_left), axis=0) # 6 * 20 * 20
+                
+                if self.symlog_tactile:
+                    tactiles = np.sign(tactiles) * np.log(1 + np.abs(tactiles))
+                
+                if self.state_type == 'vision_and_touch':
+                    img = self.render()
+                    self.curr_obs = {'image': img, 'tactile': tactiles}
+                else:
+                    self.curr_obs = {'tactile': tactiles}
 
-        if show_full:
-            self.renderer.update_scene(self.mj_data, camera=0)
-            img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
-            cv2.imshow('simulation img', img)
-            cv2.waitKey(1)
+            if show_full:
+                self.renderer.update_scene(self.mj_data, camera=0)
+                img = cv2.cvtColor(self.renderer.render(), cv2.COLOR_BGR2RGB)
+                cv2.imshow('simulation img', img)
+                cv2.waitKey(1)
 
-        img_tactile1 = self.show_tactile(self.curr_obs['tactile'][:3], name='tactile1') 
-        img_tactile2 = self.show_tactile(self.curr_obs['tactile'][3:], name='tactile2')
+            img_tactile1 = self.show_tactile(self.curr_obs['tactile'][:3], name='tactile1') 
+            img_tactile2 = self.show_tactile(self.curr_obs['tactile'][3:], name='tactile2')
+        except Exception as e:
+            print(f"Error updating tactile feedback: {e}")
+            raise
 
     def show_tactile(self, tactile, size=(480,480), max_shear=0.05, max_pressure=0.1, name='tactile'): 
         # Note: default params work well for 16x16 or 32x32 tactile sensors, adjust for other sizes
@@ -275,16 +309,16 @@ class RegraspEnv(gym.Env):
         nx = tactile.shape[2]
         ny = tactile.shape[1]
 
-        loc_x = np.linspace(0,size[1],nx)
-        loc_y = np.linspace(size[0],0,ny)
+        loc_x = np.linspace(0,size[1],nx) # 生成x坐标
+        loc_y = np.linspace(size[0],0,ny) # 生成y坐标
 
         img = np.zeros((size[0],size[1],3))
 
         for i in range(0,len(loc_x),1):
             for j in range(0,len(loc_y),1):
                 
-                dir_x = np.clip(tactile[0,j,i]/max_shear,-1,1) * 20
-                dir_y = np.clip(tactile[1,j,i]/max_shear,-1,1) * 20
+                dir_x = np.clip(tactile[0,j,i]/max_shear,-1,1) * 20 # 计算x方向的力
+                dir_y = np.clip(tactile[1,j,i]/max_shear,-1,1) * 20 # 计算y方向的力
 
                 color = np.clip(tactile[2,j,i]/max_pressure,0,1)
                 r = color
@@ -297,12 +331,12 @@ class RegraspEnv(gym.Env):
         return img
 
     def generate_initial_pose(self, show_full=True):
-        """Only initialize the environment"""
+        """Initialize the environment"""
         mujoco.mj_resetData(self.sim, self.mj_data)
         
         # set the initial position
         initial_action = np.zeros(5)
-        initial_action[2] = self.cruise_height  # start from the cruise height
+        initial_action[2] = self.CRUISE_HEIGHT  # start from the cruise height
         initial_action[3] = np.pi/2
         initial_action[4] = 0  # gripper open
         
@@ -335,7 +369,7 @@ class RegraspEnv(gym.Env):
             
         # set the random offset
         # this randomness is used to change the target position every episode
-        self.random_offset_x = np.random.uniform(-0.01, 0.01)
+        self.random_offset_x = np.random.uniform(-0.08, 0.08)
         self.random_offset_y = np.random.uniform(-0.01, 0.01)
 
         # reload the environment
@@ -347,12 +381,17 @@ class RegraspEnv(gym.Env):
             self.sim.opt.enableflags |= mujoco.mjtEnableBit.mjENBL_MULTICCD
             
         # reload the renderer
-        del self.renderer
+        if hasattr(self, 'renderer'):
+            del self.renderer
         self.renderer = mujoco.Renderer(self.sim, height=self.im_size, width=self.im_size)
         
         # initialize the position
         self.generate_initial_pose()
-        self.grasp_phase = 0
+        self.current_phase = GraspPhase.APPROACH
+        
+        # reset the step counter and phase
+        self.current_step = 0
+        self.current_phase = GraspPhase.APPROACH
         
         # get the initial observation
         obs = self._get_obs()
@@ -360,29 +399,63 @@ class RegraspEnv(gym.Env):
         
         return obs, info
 
-    def render(self, highres = False):
-        ''' Render the current scene '''
-        
-        if highres:
-            del self.renderer
-            self.renderer = mujoco.Renderer(self.sim, height=1000, width=1000)
-            self.renderer.update_scene(self.mj_data, camera=self.camera_idx)
-            img = self.renderer.render()/255
-            del self.renderer
-            self.renderer = mujoco.Renderer(self.sim, height=self.im_size, width=self.im_size)
-        else:
-            self.renderer.update_scene(self.mj_data, camera=self.camera_idx)
-            img = self.renderer.render()/255
-        
-        return img
+    def render(self):
+        """Render the current environment state"""
+        if self.render_mode == 'human':
+            self.renderer.render()
+            return True
+        return False
 
-    def step(self, u):
+
+    def step(self, action):
+        # 此处的 action 是此前的 phaseaction
+        """Take a step in the environment"""
+        # execute multiple simulation steps to ensure the action is completed
+        # STEPS_PER_PHASE = 60
+        for _ in range(self.STEPS_PER_PHASE):
+            self.mj_data.ctrl[:] = action
+            mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
+            # update the tactile feedback
+            self.update_tactile_feedback(True)
+
+        # get the observation and compute the reward
+        obs = self._get_obs()
+        
+        # check if the grasping is successful
+        if self.current_phase == GraspPhase.HOLD:
+            reward = self._compute_reward(obs)
+            is_success = self._check_success(obs)
+        else:
+            reward = 0.0
+            is_success = False
+        
+        # check if the sequence is completed
+        done = (self.current_phase == GraspPhase.HOLD)
+        
+        info = {
+            'phase': self.current_phase.name,
+            'phase_index': self.current_phase.value,
+            'target_position': [self.offset_x, self.offset_y],
+            'current_height': self.mj_data.ctrl[2],
+            'is_success': is_success  # add the information of whether the grasping is successful
+        }
+        # print("info --> [", info['phase'], info['phase_index'], 
+        #       info['target_position'], info['current_height'], 
+        #       "success:", info['is_success'], "]")
+        # print("it is the end of the step")
+
+        return obs, reward, done, False, info
+
+    def old_step(self, action):
         ''' Take a step in the environment '''
-        # get the full action for the current phase
-        action = self.get_phase_action(self.grasp_phase)
+        # update the phase
+        self._update_phase()
+        
+        # execute the action
+        action = self.get_phase_action(action)
         
         # execute multiple simulation steps to ensure the action is completed
-        for _ in range(self.steps_per_phase):
+        for _ in range(self.STEPS_PER_PHASE):
             self.mj_data.ctrl[:] = action
             mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
             # update the tactile feedback
@@ -390,24 +463,29 @@ class RegraspEnv(gym.Env):
         
         # get the observation and compute the reward
         obs = self._get_obs()
-        reward = self.compute_reward()
+        reward = self._compute_reward(obs)
         
-        # update the grasping phase
-        self.grasp_phase = (self.grasp_phase + 1) % len(self.grasp_sequence)
+        # check if the grasping is successful
+        is_success = self._check_success(obs)
         
         # check if the sequence is completed
-        done = (self.grasp_phase == 0)
+        done = (self.current_phase == GraspPhase.HOLD)
         
         info = {
-            'phase': self.grasp_sequence[self.grasp_phase],
-            'phase_index': self.grasp_phase,
+            'phase': self.current_phase.name,
+            'phase_index': self.current_phase.value,
             'target_position': [self.offset_x, self.offset_y],
-            'current_height': self.mj_data.ctrl[2]
+            'current_height': self.mj_data.ctrl[2],
+            'is_success': is_success  # add the information of whether the grasping is successful
         }
+        # print("info --> [", info['phase'], info['phase_index'], 
+        #       info['target_position'], info['current_height'], 
+        #       "success:", info['is_success'], "]")
+        # print("it is the end of the step")
         
         return obs, reward, done, False, info
     
-    def compute_reward(self):
+    def _compute_reward(self, obs):
         ''' Compute the reward for the current step '''
         # here according to the original reward definition
         # can be overloaded by subclasses
@@ -423,384 +501,124 @@ class RegraspEnv(gym.Env):
 
         return reward
 
-    def get_phase_action(self, phase):
-        ''' 
-        Get the action for the current phase
-        different phases have different actions
-        '''
+    def get_phase_action(self, target_action_xy):
+        """
+        Get the action for the current grasping phase.
+        
+        Args:
+            action (np.ndarray): the action to be executed (1D array)
+            
+        Returns:
+            np.ndarray: an array of 5 elements representing the action [x, y, z, yaw, gripper]
+            
+        Note:
+            different phases correspond to different predefined actions:
+            - approach: move to the object above
+            - grasp: close the gripper
+            - lift: lift the object
+            - hold: hold the object
+        """
         full_action = np.zeros(5)  # [x, y, z, yaw, gripper]
 
-        target_x = self.offset_x + self.random_offset_x
-        target_y = self.offset_y + 0.015 # manually compensate (left-back in the figure)
-        print("target_pos --> [", target_x, target_y, "]")
+        # y_offset = 0 #0.015
+
+        target_x = target_action_xy[0]
+        target_y = target_action_xy[1]
+        # print("target_pos (x,y) --> [", target_x, target_y, "]")
         
-        if self.grasp_sequence[phase] == 'approach':
+        if self.current_phase == GraspPhase.APPROACH:
             # move to the object above
-            full_action[:3] = [target_x, target_y, self.cruise_height]
+            full_action[:3] = [target_x, target_y, self.CRUISE_HEIGHT]
             full_action[3] = np.pi/2  # fixed angle
             full_action[4] = 0        # gripper open
-            full_action[:3] = [target_x, target_y, self.gripping_height] # move to the gripping height
+            full_action[:3] = [target_x, target_y, self.GRIPPING_HEIGHT] # move to the gripping height
             
-        elif self.grasp_sequence[phase] == 'grasp':
-            full_action[:3] = [target_x, target_y, self.gripping_height] # move to the gripping height
+        elif self.current_phase == GraspPhase.GRASP:
+            full_action[:3] = [target_x, target_y, self.GRIPPING_HEIGHT] # move to the gripping height
             full_action[3] = np.pi/2 # fixed angle
             full_action[4] = self.fixed_gripping  # use the fixed gripping force
             
-        elif self.grasp_sequence[phase] == 'lift':
+        elif self.current_phase == GraspPhase.LIFT:
             # lift the object
             full_action[4] = self.fixed_gripping
-            full_action[:3] = [target_x, target_y, self.cruise_height] # move to the cruise height
+            full_action[:3] = [target_x, target_y, self.CRUISE_HEIGHT] # move to the cruise height
             full_action[3] = np.pi/2
             
-        elif self.grasp_sequence[phase] == 'hold':
+        elif self.current_phase == GraspPhase.HOLD:
             # hold the object
-            full_action[:3] = [target_x, target_y, self.cruise_height]
+            full_action[:3] = [target_x, target_y, self.CRUISE_HEIGHT]
             full_action[3] = np.pi/2
             full_action[4] = self.fixed_gripping
                
         return full_action
     
-
-
-
-    # old functions, for reference
-    # to be deleted in the future
-    def old_edit_xml(self):
-        ''' Edit the XML file to change the object and holder '''
+    def _update_phase(self):
+        """Update the grasping phase"""
+        # calculate the total number of steps for each phase
+        total_steps = sum(self.phase_steps.values())
+        steps_passed = self.current_step % total_steps
         
-        # holders = self.holders
-        objects = self.objects
+        # determine the current phase
+        accumulated_steps = 0
+        for phase in GraspPhase:
+            accumulated_steps += self.phase_steps[phase]
+            if steps_passed < accumulated_steps:
+                self.current_phase = phase
+                break
 
-        self.xml_content = self.xml_content_reference # reset the XML content
+    def close(self):
+        """Clean up resources"""
+        if hasattr(self, 'renderer'):
+            del self.renderer
+        super().close()
 
-        def edit_attribute(attribute, offset_x, offset_y, offset_yaw, object):
-            ''' Edit the position and orientation of the object or holder '''
-            box_idx = self.xml_content.find('<body name="' + attribute + '"')
-            if box_idx == -1:
-                 print("ERROR: Could not find joint name: " + attribute)
-                 return False
-            
-            pos_key = 'pos="'
-            pos_idx = box_idx + self.xml_content[box_idx:].find(pos_key)
-            pos_start_idx = pos_idx + len(pos_key)
-            pos_end_idx = pos_start_idx + self.xml_content[pos_start_idx:].find('"')
+    def compute_force_percentage(self, obs):
+        """Compute the percentage of the vertical force to the object's weight"""
+        if self.current_phase != GraspPhase.HOLD:
+            return 0.0
 
-            pos = self.xml_content[pos_start_idx:pos_end_idx].split(" ")
-            correction_rot = np.array([float(pos[0]), float(pos[1])])
-            rotMatrix = np.array([[np.cos(offset_yaw), -np.sin(offset_yaw)], 
-                         [np.sin(offset_yaw),  np.cos(offset_yaw)]])
-            correction_rot = rotMatrix.dot(correction_rot)
-            
-            new_pos = [str(offset_x + correction_rot[0]), str(offset_y + correction_rot[1]), str(float(pos[2]))]
-            new_pos_str = " ".join(new_pos)
-
-            if attribute == 'object':
-                print(f"New object position: x={new_pos[0]}, y={new_pos[1]}, z={new_pos[2]}")
-
-            
-            self.xml_content = self.xml_content[:pos_start_idx] + new_pos_str + self.xml_content[pos_end_idx:]
-
-            euler_key = 'axisangle="'
-            euler_idx = box_idx + self.xml_content[box_idx:].find(euler_key)
-            euler_start_idx = euler_idx + len(euler_key)
-            euler_end_idx = euler_start_idx + self.xml_content[euler_start_idx:].find('"')
-
-            euler = self.xml_content[euler_start_idx:euler_end_idx].split(" ")
-            new_euler = [str(float(euler[0])), str(float(euler[1])), str(float(euler[2])), str(float(euler[3]) + offset_yaw)]
-            new_euler_str = " ".join(new_euler)
-            
-            self.xml_content = self.xml_content[:euler_start_idx] + new_euler_str + self.xml_content[euler_end_idx:]
-            
-            if attribute == 'object': # change the mesh of the object
-                for key in ['peg_visual', 'peg_collision']:
-                    key_idx = euler_end_idx + self.xml_content[euler_end_idx:].find('name="' + key + '"')
-                    key_end_idx = key_idx + len('name="' + key + '"')
-            
-                    mesh_idx = key_end_idx + self.xml_content[key_end_idx:].find('mesh="')
-                    mesh_start_idx = mesh_idx + len('mesh="')
-                    mesh_end_idx = mesh_start_idx + self.xml_content[mesh_start_idx:].find('"')
-
-                    self.xml_content = self.xml_content[:mesh_start_idx] + object + self.xml_content[mesh_end_idx:]
-
-                    
-            else:
-                for i in range(1,5):
-                    break
-                #     for key in ['wall{}_visual'.format(i), 'wall{}_collision'.format(i)]:
-                #         key_idx = euler_end_idx + self.xml_content[euler_end_idx:].find('name="' + key + '"')
-                #         key_end_idx = key_idx + len('name="' + key + '"')
-                    
-                #         mesh_idx = key_end_idx + self.xml_content[key_end_idx:].find('mesh="')
-                #         mesh_start_idx = mesh_idx + len('mesh="')
-                #         mesh_end_idx = mesh_start_idx + self.xml_content[mesh_start_idx:].find('"')
-
-                #         self.xml_content = self.xml_content[:mesh_start_idx] + object + '_wall' + str(i) + self.xml_content[mesh_end_idx:]
-                
-            return True
-            
+        tactile_data = obs['tactile']
         
-        offset_x = 0
-        offset_y = 0
+        # 获取物体实际质量
+        object_mass = 0.5  # 获取物体实际质量
+        # print(f"\n物体信息:")
+        # print(f"物体质量: {object_mass:.4f} kg")
 
-        if self.with_rotation:
-            # 可以设置随机的物体角度
-            # offset_yaw = 2*np.pi*np.random.rand()-np.pi
-            offset_yaw = 0
-        else:
-            offset_yaw = 0.
-
-        # object = np.random.choice(objects)
-        object = objects[1]
-
-        edit_attribute("object", offset_x, offset_y, offset_yaw, object)
-        edit_attribute("walls", offset_x, offset_y, offset_yaw, object)
-
-        self.offset_x = offset_x
-        self.offset_y = offset_y
-        self.offset_yaw = offset_yaw
-        self.target_quat = np.array([np.cos(offset_yaw/2), 0, 0, np.sin(offset_yaw/2)])
-
-    def old_step(self, u):
-        ''' Take a step in the environment '''
-        action = u
-        action = np.clip(u, -1., 1.)
-
-        # # 根据当前阶段执行相应的动作
-        # action = self.convert_action_to_sequence(action, self.grasp_phase)
-
-        # Unnormalize action
-        action_unnorm = (action + 1) / 2 * (self.action_scale[:, 1] - self.action_scale[:, 0]) + self.action_scale[:, 0] # 将归一化的动作转换为实际的控制量
-
-        if self.max_delta is not None:
-            action_unnorm = np.clip(action_unnorm[:3], self.prev_action_xyz - self.max_delta, self.prev_action_xyz + self.max_delta)
-
-        self.prev_action_xyz = action_unnorm
-
-        # 控制抓取力和旋转角度
-        if self.with_rotation:
-            self.mj_data.ctrl[3] = -action_unnorm[3]
-        else:
-            self.mj_data.ctrl[3] = 0
-        if not self.adaptive_gripping:
-            self.mj_data.ctrl[-1] = self.fixed_gripping  # 保持固定抓取力
-        else:
-            self.mj_data.ctrl[-1] = action_unnorm[-1]  # 控制抓取力
-
-        # 控制机械臂的位置
-        self.mj_data.ctrl[:3] = action_unnorm[:3]
-
-        # 进行仿真步骤，更新状态
-        mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
-
-        # 实时更新触觉反馈
-        if self.state_type == 'vision_and_touch':
-            tactiles_right = self.mj_data.sensor('touch_right').data.reshape((3, self.tactile_rows, self.tactile_cols))
-            tactiles_right = tactiles_right[[1, 2, 0]]  # 转换坐标轴顺序
-            tactiles_left = self.mj_data.sensor('touch_left').data.reshape((3, self.tactile_rows, self.tactile_cols))
-            tactiles_left = tactiles_left[[1, 2, 0]]
-            tactiles = np.concatenate((tactiles_right, tactiles_left), axis=0)
-            if self.symlog_tactile:
-                tactiles = np.sign(tactiles) * np.log(1 + np.abs(tactiles))
-            img = self.render()
-            self.curr_obs = {'image': img, 'tactile': tactiles}
-
-        elif self.state_type == 'vision':
-            img = self.render()
-            self.curr_obs = {'image': img}
-
-        elif self.state_type == 'touch':
-            tactiles_right = self.mj_data.sensor('touch_right').data.reshape((3, self.tactile_rows, self.tactile_cols))
-            tactiles_right = tactiles_right[[1, 2, 0]]
-            tactiles_left = self.mj_data.sensor('touch_left').data.reshape((3, self.tactile_rows, self.tactile_cols))
-            tactiles_left = tactiles_left[[1, 2, 0]]
-            tactiles = np.concatenate((tactiles_right, tactiles_left), axis=0)
-            if self.symlog_tactile:
-                tactiles = np.sign(tactiles) * np.log(1 + np.abs(tactiles)) # 对触觉数据进行对称对数变换
-            self.curr_obs = {'tactile': tactiles}
-
-        elif self.state_type == 'privileged':
-            self.curr_obs = {'state': np.concatenate((self.mj_data.qpos.copy(), self.mj_data.qvel.copy(), [self.offset_x, self.offset_y, self.offset_yaw]))}
-
-        # 计算奖励
-        pos = self.mj_data.qpos[-7:-4]
-        quat = self.mj_data.qpos[-4:]
-
-        delta_x = pos[0] - self.offset_x
-        delta_y = pos[1] - self.offset_y
-        delta_z = pos[2] - self.init_z
-        delta_quat = np.linalg.norm(quat - self.target_quat)
-
-        reward = -np.log(100 * np.sqrt(delta_x**2 + delta_y**2 + delta_z**2 + int(self.with_rotation) * delta_quat**2) + 1)
-
-        # 判断任务是否完成
-        done = np.sqrt(delta_x**2 + delta_y**2 + delta_z**2) < 4e-3
-        if done:
-            reward = 1000
-
-        info = {'is_success': done}
-
-        # 返回观测结果、奖励、完成状态等
-        obs = self._get_obs()
-
-        print(">>>>>>>>>>reward: ", reward)
-
-        # 更新抓取阶段 # new 
-        self.grasp_phase = (self.grasp_phase + 1) % len(self.grasp_sequence)
+        # tactile_data shape is (6,20,20), the first 3 channels are the right tactile sensors, 
+        # the last 3 channels are the left tactile sensors
+        # y direction tactile sum
+        factor = 4.9050/12.30 # 合力与实际重力对齐
+        y_sum_right = np.sum(tactile_data[1,:,:]) # right sensor y direction sum
+        y_sum_left = np.sum(tactile_data[4,:,:])  # left sensor y direction sum
+        total_y_sum = -(y_sum_right + y_sum_left) * factor
         
-        # 如果完成了整个抓取序列，设置done为True # new
-        if self.grasp_phase == 0:  # 回到初始阶段
-            done = True
+        # print("Y direction tactile sum: ", -total_y_sum, "N (Gravity direction)")
 
-        return obs, reward, done, False, info
+        # 计算理论重力
+        gravity = 9.81  # m/s^2
+        gravity_force = object_mass * gravity
 
-    def old_reset(self, seed=None, options=None):
-        ''' 
-        Reset the environment
-        func: reset the environment and return the observation and info
-        '''
-
-        if seed is not None:
-            np.random.seed(seed)
+        # 打印详细分析
+        # print("\n传感器数据分析:")
+        # print(f"理论重力: {gravity_force:.4f} N")
         
-        # Reload XML (and update robot)
-        self.edit_xml()
-        self.sim = mujoco.MjModel.from_xml_string(self.xml_content)
+        # 计算力的比值
+        percentage_force = total_y_sum / gravity_force
+        if self.current_phase == GraspPhase.HOLD:
+            print(f"力的比值: {percentage_force:.4f}")
         
-        self.mj_data = mujoco.MjData(self.sim)
-        if self.multiccd:
-            self.sim.opt.enableflags |= mujoco.mjtEnableBit.mjENBL_MULTICCD 
+        return percentage_force
+
+    def _check_success(self, obs):
+        """Check if the grasping is successful
         
-        del self.renderer
-        self.renderer = mujoco.Renderer(self.sim, height=self.im_size, width=self.im_size)
-
-        self.generate_initial_pose() # 生成初始位姿
-        self.grasp_phase = 0 # new # 初始化抓取阶段
-
-        if self.state_type == 'vision_and_touch': 
-            tactiles_right = self.mj_data.sensor('touch_right').data.reshape((3, self.tactile_rows, self.tactile_cols))
-            tactiles_right = tactiles_right[[1, 2, 0]] # zxy -> xyz
-            tactiles_left = self.mj_data.sensor('touch_left').data.reshape((3, self.tactile_rows, self.tactile_cols))
-            tactiles_left = tactiles_left[[1, 2, 0]] # zxy -> xyz
-            tactiles = np.concatenate((tactiles_right, tactiles_left), axis=0)
-            if self.symlog_tactile: # 对触觉数据进行对称对数变换
-                tactiles = np.sign(tactiles) * np.log(1 + np.abs(tactiles))
-            img = self.render()
-            self.curr_obs = {'image': img, 'tactile': tactiles}
-        elif self.state_type == 'vision':
-            img = self.render()
-            self.curr_obs = {'image': img}
-        elif self.state_type == 'touch':
-            tactiles_right = self.mj_data.sensor('touch_right').data.reshape((3, self.tactile_rows, self.tactile_cols))
-            tactiles_right = tactiles_right[[1, 2, 0]] # zxy -> xyz
-            tactiles_left = self.mj_data.sensor('touch_left').data.reshape((3, self.tactile_rows, self.tactile_cols))
-            tactiles_left = tactiles_left[[1, 2, 0]] # zxy -> xyz
-            tactiles = np.concatenate((tactiles_right, tactiles_left), axis=0)
-            if self.symlog_tactile:
-                tactiles = np.sign(tactiles) * np.log(1 + np.abs(tactiles))
-            self.curr_obs = {'tactile': tactiles}
-        elif self.state_type == 'privileged':
-            self.curr_obs = {'state': np.concatenate((self.mj_data.qpos.copy(), self.mj_data.qvel.copy(), [self.offset_x,self.offset_y,self.offset_yaw]))}
+        Success condition: in the HOLD phase, the vertical force is greater than or equal to 90% of the object's weight
         
-        info = {'id': np.array([self.id])}
-
+        Returns:
+            bool: whether the grasping is successful
+        """
+        percentage_force = self.compute_force_percentage(obs)
+        threshold = 0.99 # 0.97
+        is_success = percentage_force >= threshold
         
-        return self._get_obs(), info
-
-    def old_generate_initial_pose(self, show_full=True):
-        ''' Generate the initial pose & movements of the robot '''
-        
-        # # 原始参数
-        cruise_height = -0.03
-        gripping_height = -0.13 #-0.11
-
-        # 自定义参数
-        # cruise_height = -0.005 # 巡航高度
-        # gripping_height = 0 # 抓取高度
-        
-        mujoco.mj_resetData(self.sim, self.mj_data)
-
-        # Randomize the initial position of the robot
-        rand_x = np.random.rand()*0.2 - 0.1 
-        rand_y = np.random.rand()*0.2 - 0.1
-        if self.with_rotation:
-            rand_yaw = np.random.rand()*2*np.pi - np.pi
-        else:
-            rand_yaw = 0
-
-        '''debug，调整位置，random的动作的最终位置'''
-        # rand_x = 0
-        # rand_y = 0
-        rand_yaw = np.pi/2
-
-        displacement_x = 0
-
-        steps_per_phase = 60 
-        ##########################################
-        # new movements below
-        for _ in range(1):  # 抓取、放开、旋转
-            # displacement_x -= 0.005
-            # displacement_x = 0
-            # for i in range(steps_per_phase):  # 旋转角度
-            #     self.mj_data.ctrl[3] = rand_yaw
-            #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
-            #     # 实时更新触觉反馈
-            #     self.update_tactile_feedback(show_full)
-
-            # for i in range(steps_per_phase):  # 移动到物体附近
-            #     self.mj_data.ctrl[:3] = [self.offset_x + displacement_x, self.offset_y, gripping_height]
-            #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
-            #     # 实时更新触觉反馈
-            #     self.update_tactile_feedback(show_full)
-            
-            # for i in range(steps_per_phase):  # 抓住物体
-            #     self.mj_data.ctrl[-1] = self.fixed_gripping
-            #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
-            #     # 实时更新触觉反馈
-            #     self.update_tactile_feedback(show_full)
-
-            # for i in range(steps_per_phase): # lift object
-            #     self.mj_data.ctrl[:3] = [self.offset_x+ displacement_x, self.offset_y, cruise_height]
-            #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
-            #     self.update_tactile_feedback(show_full)
-
-            # for i in range(steps_per_phase): # lay down object
-            #     self.mj_data.ctrl[:3] = [self.offset_x+ displacement_x, self.offset_y, gripping_height]
-            #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame+1)
-            #     self.update_tactile_feedback(show_full)
-
-            for i in range(steps_per_phase):  # 放开物体
-                self.mj_data.ctrl[-1] = 0  # 放开
-                mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
-                # 实时更新触觉反馈
-                self.update_tactile_feedback(show_full)
-            
-            for i in range(steps_per_phase):  # 旋转角度
-                self.mj_data.ctrl[3] = rand_yaw
-                mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
-                # 实时更新触觉反馈
-                self.update_tactile_feedback(show_full)
-
-            for i in range(steps_per_phase):  # 移动到物体附近
-                self.mj_data.ctrl[:3] = [self.offset_x + displacement_x, self.offset_y, gripping_height]
-                mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
-                # 实时更新触觉反馈
-                self.update_tactile_feedback(show_full)
-
-            # for i in range(steps_per_phase):  # 旋转角度
-            #     self.mj_data.ctrl[3] = 0
-            #     mujoco.mj_step(self.sim, self.mj_data, self.skip_frame + 1)
-            #     # 实时更新触觉反馈
-            #     self.update_tactile_feedback(show_full)
-
-
-        ##########################################
-
-
-        self.prev_action_xyz = np.array([rand_x, rand_y, cruise_height])
-
-        pos = self.mj_data.qpos[-7:-4]
-        
-        if pos[2] < (cruise_height - gripping_height)/2:
-            print('Failed to grasp')
-    
-
+        return is_success

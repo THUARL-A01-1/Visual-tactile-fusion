@@ -318,8 +318,8 @@
     </body> -->
 
     <!-- object to be grasped -->
-    <!-- <include file="complex_objects/discrete_2d/I1.xml"/> -->
-    <include file="complex_objects/continue_1d/obj_1.xml"/>
+    <!-- <include file="complex_objects/continue_1d/obj_0.xml"/> -->
+    <include file="complex_objects/continue_1d/obj_0.xml"/>
 
     <body name="walls" pos="0 0 0.00" axisangle="0 0 1 0.0">
       <!-- <geom class="visual" name="table_visual" mesh="custom_obj" rgba="0.5 0.5 0.5 1" friction=".3" priority="1" solref="0.007 1"/>

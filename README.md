@@ -104,7 +104,7 @@ python scripts/train_from_failure.py --n_episodes 50 --n_steps 500 --show_highre
 This command runs 50 episodes, with 500 steps per episode, using tactile information only and high-resolution images.
 Available parameters including: `--n_episodes`, `--n_steps`, `--show_highres`, `--seed`, `--env_name`, `--state_type`, `--multiccd`, `--im_size`, `--no_gripping`, `--no_rotation`, `--tactile_shape`, `--max_delta`. To see all available options and defaults, use:
 ``` bash
-python scripts/test_env_grip.py --help
+python scripts/train_from_failure.py --help
 ```
 
 
